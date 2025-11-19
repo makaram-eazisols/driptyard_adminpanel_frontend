@@ -1,0 +1,28 @@
+---
+alwaysApply: true
+---
+ These color roles should consistently apply across all themes, states, and components to maintain a unified visual identity.
+🎨 Color Scheme & Typography Roles
+Color Role	Hex Code	Name / Description	Usage Rationale
+Primary (Brand)	#0B0B0D	Deep Charcoal Black	Feels premium and timeless. Creates high contrast, allowing other elements to stand out. More sophisticated than pure black.
+Secondary (Trust)	#1F4E79	Deep Navy Blue	Conveys trust, reliability, and professionalism — ideal for authentication and security-oriented messaging.
+Accent (CTAs / Highlights)	#E0B74F	Muted Gold	Adds a touch of luxury and distinction. Use sparingly for key actions like “Purchase” or highlighted states.
+Neutral Background	#F8F8F8	Soft Warm White	Keeps the interface light, clean, and approachable. Enhances readability and balances darker tones.
+Text / Body Copy	#333333	Dark Gray	Offers better readability than pure black for long-form content; feels softer and more natural.
+Success / Verification	#2ECC71	Soft Green	Symbolizes approval and trust. Ideal for verified states or success notifications.
+Error / Alert	#E74C3C	Muted Red	Communicates errors or alerts clearly without feeling harsh or alarming.
+
+Applied Typography:
+✅ Headings/Logo - Playfair Display (all h1-h6 tags automatically use this)
+✅ Subheading - Playfair Display Italic (available via font-playfair italic)
+✅ Body Text - Inter (default for all body text)
+✅ Button Text - Bold Inter (via font-weight classes)
+✅ Price Text - Bold Inter (via font-weight classes)
+
+ 
+Visual & Technical Consistency - Please clarify and confirm these will 
+be consistent throughout development, thanks. 
+● Use Playfair Display for headings and Inter/Manrope for body and UI elements. 
+● Gold (#E0B74F) should be used only for CTAs, badges, and key highlights. 
+● Buttons should have subtle hover transitions for a luxury feel. 
+● Check tablet (iPad) responsiveness specifically — often missed in early builds.
