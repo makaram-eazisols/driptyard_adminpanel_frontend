@@ -81,11 +81,11 @@ export default function Login() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-4 text-center">
           <div className="flex justify-center">
-            <div className="w-16 h-16 rounded-2xl gradient-driptyard flex items-center justify-center shadow-lg">
-              <ShoppingCart className="h-8 w-8 text-white" strokeWidth={2.5} />
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg" style={{ backgroundColor: '#E0B74F' }}>
+              <ShoppingCart className="h-8 w-8" strokeWidth={2.5} style={{ color: '#0B0B0D' }} />
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold gradient-driptyard-text">
+          <CardTitle className="text-2xl font-bold" style={{ color: '#0B0B0D' }}>
             DRIPTYARD Admin
           </CardTitle>
           <CardDescription>

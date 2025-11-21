@@ -37,6 +37,7 @@ class ApiClient {
         const isRefreshRequest = originalRequest.url?.includes("/auth/refresh");
         const isLogoutRequest = originalRequest.url?.includes("/auth/logout");
         const isLoginRequest = originalRequest.url?.includes("/auth/login");
+        const isPasswordResetVerify = originalRequest.url?.includes("/auth/password-reset/verify");
 
         if (
           error.response?.status === 401 &&
@@ -44,6 +45,7 @@ class ApiClient {
           !isRefreshRequest &&
           !isLogoutRequest &&
           !isLoginRequest &&
+          !isPasswordResetVerify &&
           typeof window !== "undefined"
         ) {
           originalRequest._retry = true;
@@ -100,8 +102,19 @@ class ApiClient {
   }
 
   async logout() {
-    const response = await this.client.post("/auth/logout");
-    return response.data;
+    try {
+      const response = await this.client.post("/auth/logout");
+      return response.data;
+    } catch (error) {
+      // Handle 403 or other errors gracefully - logout should succeed even if API call fails
+      // 403 might mean token is already invalid, which is fine for logout
+      if (error.response?.status === 403 || error.response?.status === 401) {
+        // Token is invalid/expired, but logout should still proceed
+        return { success: true, message: "Logged out successfully" };
+      }
+      // For other errors, still allow logout to proceed
+      throw error;
+    }
   }
 
   async register(data) {
@@ -128,6 +141,17 @@ class ApiClient {
     const response = await this.client.post("/auth/password-reset/verify", {
       code,
       new_password,
+    });
+    return response.data;
+  }
+
+  async verifyPasswordResetAdmin(email, new_password, current_password) {
+    const response = await this.client.post("/auth/password-reset/verify", {
+      email,
+      reset_token: null,
+      new_password,
+      is_admin: true,
+      current_password: current_password || null,
     });
     return response.data;
   }

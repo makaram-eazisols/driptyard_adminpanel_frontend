@@ -27,7 +27,7 @@ const menuItems = [
   { title: "Dashboard", url: "/admin", icon: Home, end: true },
   { title: "Products", url: "/admin/products", icon: Package2 },
   { title: "Users", url: "/admin/users", icon: Users2 },
-  // { title: "Flagged Content", url: "/admin/flagged", icon: Flag },
+  { title: "Flagged Content", url: "/admin/flagged", icon: Flag },
   // { title: "Spotlight", url: "/admin/spotlight", icon: Star },
 ];
 

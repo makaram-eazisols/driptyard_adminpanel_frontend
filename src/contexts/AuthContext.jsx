@@ -124,11 +124,20 @@ export const AuthProvider = ({ children }) => {
     try {
       await apiClient.logout();
     } catch (error) {
-      console.error("Logout error:", error);
+      // Log error but don't prevent logout - clear tokens regardless
+      // 403/401 errors are acceptable during logout (token might already be invalid)
+      if (error.response?.status !== 403 && error.response?.status !== 401) {
+        console.error("Logout error:", error);
+      }
     } finally {
+      // Always clear user state and tokens, even if API call failed
       setUser(null);
       localStorage.removeItem("access_token");
       localStorage.removeItem("refresh_token");
+      // Redirect to login page
+      if (typeof window !== "undefined") {
+        window.location.href = "/admin/login";
+      }
     }
   };
 

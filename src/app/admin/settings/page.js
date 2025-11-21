@@ -12,12 +12,15 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Mail, Send, CheckCircle, Eye, EyeOff, Lock, Loader2 } from "lucide-react";
+import { Mail, Send, CheckCircle, Eye, EyeOff, Lock, Loader2, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api-client";
+import { useAuth } from "@/hooks/use-auth";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 function Settings() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [emailProvider, setEmailProvider] = useState("smtp");
   const [testEmail, setTestEmail] = useState("");
   const [showSmtpPassword, setShowSmtpPassword] = useState(false);
@@ -25,7 +28,7 @@ function Settings() {
   const [showSendgridApiKey, setShowSendgridApiKey] = useState(false);
   const [showMailgunApiKey, setShowMailgunApiKey] = useState(false);
   
-  // Password change states
+  // Password reset states
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -34,6 +37,7 @@ function Settings() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [passwordErrors, setPasswordErrors] = useState({});
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   const handleTestEmail = () => {
     toast({
@@ -51,8 +55,14 @@ function Settings() {
 
   const handleChangePassword = async () => {
     setPasswordErrors({});
+    setErrorMessage("");
     
     // Validation
+    if (!user?.email) {
+      setErrorMessage("User email not found. Please log in again.");
+      return;
+    }
+    
     if (!currentPassword) {
       setPasswordErrors({ currentPassword: "Current password is required" });
       return;
@@ -63,8 +73,13 @@ function Settings() {
       return;
     }
     
-    if (newPassword.length < 6) {
-      setPasswordErrors({ newPassword: "Password must be at least 6 characters" });
+    if (newPassword.length < 8) {
+      setPasswordErrors({ newPassword: "Password must be at least 8 characters" });
+      return;
+    }
+
+    if (newPassword.length > 100) {
+      setPasswordErrors({ newPassword: "Password must be at most 100 characters" });
       return;
     }
     
@@ -80,26 +95,33 @@ function Settings() {
 
     setIsChangingPassword(true);
     try {
-      await apiClient.changePassword(currentPassword, newPassword);
+      await apiClient.verifyPasswordResetAdmin(
+        user.email,
+        newPassword,
+        currentPassword
+      );
       toast({
         title: "Success",
-        description: "Your password has been changed successfully.",
+        description: "Your password has been reset successfully.",
       });
       // Clear form
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
       setPasswordErrors({});
+      setErrorMessage("");
     } catch (error) {
-      const errorMessage = error.response?.data?.detail || error.message || "Failed to change password";
-      if (errorMessage.toLowerCase().includes("current password") || errorMessage.toLowerCase().includes("incorrect")) {
-        setPasswordErrors({ currentPassword: "Current password is incorrect" });
+      // Check for message field first, then detail, then fallback
+      const apiMessage = error.response?.data?.message;
+      const apiDetail = error.response?.data?.detail;
+      const errorMsg = apiMessage || apiDetail || error.message || "Failed to reset password";
+      
+      if (errorMsg.toLowerCase().includes("current password") || errorMsg.toLowerCase().includes("incorrect")) {
+        const displayMessage = apiMessage || "Current password is incorrect";
+        setErrorMessage(displayMessage);
+        setPasswordErrors({ currentPassword: displayMessage });
       } else {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: errorMessage,
-        });
+        setErrorMessage(errorMsg);
       }
     } finally {
       setIsChangingPassword(false);
@@ -125,6 +147,13 @@ function Settings() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {errorMessage && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Error</AlertTitle>
+                <AlertDescription>{errorMessage}</AlertDescription>
+              </Alert>
+            )}
             <div className="space-y-2">
               <Label htmlFor="current-password">Current Password</Label>
               <div className="relative">
@@ -183,7 +212,7 @@ function Settings() {
                 <p className="text-sm text-destructive">{passwordErrors.newPassword}</p>
               )}
               <p className="text-sm text-muted-foreground">
-                Password must be at least 6 characters long
+                Password must be between 8 and 100 characters long
               </p>
             </div>
             <div className="space-y-2">
