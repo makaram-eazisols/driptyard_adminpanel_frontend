@@ -34,6 +34,12 @@ const mockAppeals = [
   },
 ];
 
+const STATUS_SUCCESS_STATES = ["approved", "restored", "resolved"];
+
+const getStatusBadgeVariant = (status) => {
+  return STATUS_SUCCESS_STATES.includes((status || "").toLowerCase()) ? "success" : "destructive";
+};
+
 function Appeals() {
   const [searchTerm, setSearchTerm] = useState("");
   const [rejectReasons, setRejectReasons] = useState({});
@@ -56,20 +62,22 @@ function Appeals() {
   return (
     <AdminLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-[#0B0B0D]">
-            Authentication Appeals
-          </h1>
-          <p className="text-muted-foreground">Review listing rejection appeals</p>
-        </div>
-        <div className="relative max-w-md">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-          <Input
-            placeholder="Search appeals..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-secondary">
+              Authentication Appeals
+            </h1>
+            <p className="text-muted-foreground">Review listing rejection appeals</p>
+          </div>
+          <div className="relative w-full max-w-sm md:max-w-xs">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+            <Input
+              placeholder="Search appeals..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
         </div>
         <div className="grid gap-4">
           {mockAppeals.map((appeal) => (
@@ -85,7 +93,7 @@ function Appeals() {
                       Submitted: {appeal.submittedDate}
                     </p>
                   </div>
-                  <Badge variant="secondary" className="capitalize">
+                  <Badge variant={getStatusBadgeVariant(appeal.status)} className="capitalize">
                     {appeal.status}
                   </Badge>
                 </div>

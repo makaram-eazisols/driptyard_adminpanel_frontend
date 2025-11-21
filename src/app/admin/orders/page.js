@@ -16,6 +16,8 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 
+const SUCCESS_ORDER_STATUSES = ["completed", "shipped", "delivered", "paid"];
+
 const orders = [
   { id: "ORD001", customer: "John Doe", email: "john@example.com", date: "2025-01-10", total: "$1,299", status: "completed" },
   { id: "ORD002", customer: "Jane Smith", email: "jane@example.com", date: "2025-01-10", total: "$89", status: "pending" },
@@ -31,7 +33,7 @@ function Orders() {
     <AdminLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold text-[#0B0B0D]">Orders</h1>
+          <h1 className="text-3xl font-bold text-secondary">Orders</h1>
           <p className="text-muted-foreground mt-1">Track and manage customer orders</p>
         </div>
 
@@ -71,13 +73,9 @@ function Orders() {
                     <TableCell>
                       <Badge
                         variant={
-                          order.status === "completed"
-                            ? "default"
-                            : order.status === "pending"
-                            ? "secondary"
-                            : order.status === "shipped"
-                            ? "outline"
-                            : "outline"
+                          SUCCESS_ORDER_STATUSES.includes((order.status || "").toLowerCase())
+                            ? "success"
+                            : "destructive"
                         }
                       >
                         {order.status}

@@ -17,6 +17,13 @@ export const AuthProvider = ({ children }) => {
         return;
       }
 
+      // Skip auth check if we're already on the login page
+      const isOnLoginPage = window.location.pathname.includes("/login");
+      if (isOnLoginPage) {
+        setIsLoading(false);
+        return;
+      }
+
       const token = localStorage.getItem("access_token");
       if (token) {
         try {
@@ -40,14 +47,20 @@ export const AuthProvider = ({ children }) => {
           };
           setUser(mappedUser);
         } catch (error) {
-          console.error("Failed to fetch user:", error);
-          // Only clear tokens if it's a 401 (unauthorized) error
-          // The interceptor will handle redirect if refresh fails
-          if (error.response?.status === 401) {
+          // Handle network errors gracefully
+          const isNetworkError = !error.response || error.code === "ERR_NETWORK" || error.message === "Network Error";
+          const isUnauthorized = error.response?.status === 401;
+          
+          // Only log non-network errors to avoid console spam
+          if (!isNetworkError) {
+            console.error("Failed to fetch user:", error);
+          }
+          
+          // Clear tokens on unauthorized or network errors (but not on login page)
+          if (isUnauthorized || isNetworkError) {
             localStorage.removeItem("access_token");
             localStorage.removeItem("refresh_token");
-            // Don't redirect here - let the interceptor handle it
-            // or redirect only if we're not already on login page
+            // Don't redirect if we're already on login page
             if (typeof window !== "undefined" && !window.location.pathname.includes("/login")) {
               // Small delay to let interceptor handle redirect first
               setTimeout(() => {

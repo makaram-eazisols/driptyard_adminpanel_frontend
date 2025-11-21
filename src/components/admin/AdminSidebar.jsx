@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 import { 
   Home, 
   Package2, 
@@ -9,6 +10,7 @@ import {
   Star,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
+import { cn } from "@/lib/utils";
 import {
   Sidebar,
   SidebarContent,
@@ -30,6 +32,8 @@ const menuItems = [
 ];
 
 export function AdminSidebar() {
+  const pathname = usePathname();
+  
   return (
     <Sidebar className="border-r border-border bg-card" collapsible="offcanvas">
       <SidebarHeader className="border-b border-border p-6">
@@ -46,25 +50,34 @@ export function AdminSidebar() {
       </SidebarHeader>
       <SidebarContent className="p-4">
         <SidebarGroup>
-          <SidebarGroupLabel className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-            Management
-          </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu className="space-y-1">
-              {menuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <NavLink 
-                      href={item.url}
-                      className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-foreground/70 transition-all hover:bg-muted hover:text-foreground"
-                      activeClassName="bg-[#E0B74F] text-[#0B0B0D] font-semibold shadow-md hover:bg-[#E0B74F]/90"
-                    >
-                      <item.icon className="h-5 w-5" strokeWidth={2} />
-                      <span className="text-sm">{item.title}</span>
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {menuItems.map((item) => {
+                const isActive = pathname === item.url || (item.url !== "/admin" && pathname?.startsWith(item.url));
+                
+                return (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild>
+                      <NavLink 
+                        href={item.url}
+                        className={cn(
+                          "group flex items-center gap-3 rounded-lg px-3 py-2.5 text-foreground/70 transition-all",
+                          !isActive && "hover:bg-muted hover:text-foreground",
+                        )}
+                        activeClassName="bg-primary text-primary-foreground font-semibold shadow-md"
+                      >
+                        <item.icon
+                          className={cn(
+                            "h-5 w-5 transition-colors",
+                          )}
+                          strokeWidth={2}
+                        />
+                        <span className="text-sm">{item.title}</span>
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

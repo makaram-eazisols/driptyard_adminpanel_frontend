@@ -66,12 +66,12 @@ function Spotlight() {
   return (
     <AdminLayout>
       <div className="space-y-6">
-        {/* <div>
-          <h1 className="text-3xl font-bold text-[#0B0B0D]">
+        <div>
+          <h1 className="text-3xl font-bold text-secondary">
             Admin Spotlight
           </h1>
           <p className="text-muted-foreground">Manually feature and boost product listings</p>
-        </div> */}
+        </div>
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">

@@ -155,6 +155,14 @@ class ApiClient {
     return response.data;
   }
 
+  async changePassword(currentPassword, newPassword) {
+    const response = await this.client.post("/users/me/change-password", {
+      current_password: currentPassword,
+      new_password: newPassword,
+    });
+    return response.data;
+  }
+
   // ============ PRODUCT ENDPOINTS ============
   async getFeaturedProducts(page = 1, pageSize = 10) {
     const response = await this.client.get("/products/featured", {
@@ -233,7 +241,7 @@ class ApiClient {
   }
 
   async updateAdminProduct(productId, data) {
-    const response = await this.client.patch(`/admin/products/${productId}`, data);
+    const response = await this.client.put(`/admin/products/${productId}`, data);
     return response.data;
   }
 
@@ -265,6 +273,27 @@ class ApiClient {
 
   async deleteAdminUser(userId) {
     const response = await this.client.delete(`/admin/users/${userId}`);
+    return response.data;
+  }
+
+  // ============ ADMIN REPORTS ENDPOINTS ============
+  async getAdminReports(params) {
+    const response = await this.client.get("/admin/reports", { params });
+    return response.data;
+  }
+
+  async rejectReport(reportId) {
+    const response = await this.client.post(`/admin/reports/${reportId}/reject`);
+    return response.data;
+  }
+
+  async approveReport(reportId) {
+    const response = await this.client.post(`/admin/reports/${reportId}/approve`);
+    return response.data;
+  }
+
+  async reviewReport(reportId) {
+    const response = await this.client.post(`/admin/reports/${reportId}/review`);
     return response.data;
   }
 }

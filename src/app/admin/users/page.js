@@ -43,6 +43,7 @@ function Users() {
   const [editUser, setEditUser] = useState(null);
   const [deleteUserId, setDeleteUserId] = useState(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editLoading, setEditLoading] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -81,6 +82,7 @@ function Users() {
     if (!editUser) return;
 
     try {
+      setEditLoading(true);
       await apiClient.updateAdminUser(editUser.id, {
         first_name: editUser.first_name,
         last_name: editUser.last_name,
@@ -102,6 +104,8 @@ function Users() {
         description: "Failed to update user",
         variant: "destructive",
       });
+    } finally {
+      setEditLoading(false);
     }
   };
 
@@ -126,10 +130,8 @@ function Users() {
   };
 
   const getStatusBadgeVariant = (user) => {
-    if (user.is_banned) return "destructive";
-    if (!user.is_active) return "secondary";
-    if (!user.is_verified) return "outline";
-    return "default";
+    const isHealthy = !user.is_banned && user.is_active && user.is_verified;
+    return isHealthy ? "success" : "destructive";
   };
 
   const getStatusText = (user) => {
@@ -142,28 +144,26 @@ function Users() {
   return (
     <AdminLayout>
       <div className="space-y-6">
-        {/* <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-[#0B0B0D]">Users</h1>
+            <h1 className="text-3xl font-bold text-secondary">Users</h1>
             <p className="text-muted-foreground mt-1">Manage user accounts and permissions</p>
           </div>
-        </div> */}
+          <div className="relative w-full max-w-sm md:max-w-xs">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search users..."
+              className="pl-10 bg-background"
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1);
+              }}
+            />
+          </div>
+        </div>
         <Card>
           <CardContent className="p-6">
-            <div className="flex items-center gap-4 mb-6">
-              <div className="relative max-w-md">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search users..."
-                  className="pl-10 bg-background"
-                  value={searchTerm}
-                  onChange={(e) => {
-                    setSearchTerm(e.target.value);
-                    setCurrentPage(1);
-                  }}
-                />
-              </div>
-            </div>
             {loading ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -269,7 +269,7 @@ function Users() {
 
       {/* Edit User Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent>
+        <DialogContent onOpenAutoFocus={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>Edit User</DialogTitle>
           </DialogHeader>
@@ -331,7 +331,8 @@ function Users() {
                 >
                   Cancel
                 </Button>
-                <Button onClick={handleSaveUser} className="gradient-driptyard-hover text-white">
+                <Button onClick={handleSaveUser} className="gradient-driptyard-hover text-white" disabled={editLoading}>
+                  {editLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                   Save Changes
                 </Button>
               </div>

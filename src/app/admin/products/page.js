@@ -33,6 +33,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 
+const CONDITIONS = [
+  { value: "New", label: "New" },
+  { value: "Like New", label: "Like New" },
+  { value: "Used", label: "Used" },
+  { value: "Heavily Used", label: "Heavily Used" },
+];
+
 function Products() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -95,10 +102,11 @@ function Products() {
     try {
       setEditLoading(true);
       await apiClient.updateAdminProduct(editProduct.id, {
+        title: editProduct.title,
+        price: Number(editProduct.price) || 0,
+        condition: editProduct.condition,
         is_active: editProduct.is_active,
         is_verified: editProduct.is_verified,
-        is_flagged: editProduct.is_flagged,
-        is_featured: editProduct.is_featured,
       });
       toast({
         title: "Success",
@@ -118,11 +126,13 @@ function Products() {
   };
 
   const getStatusBadgeVariant = (product) => {
-    if (!product.is_active) return "secondary";
-    if (product.is_sold) return "secondary";
-    if (product.is_flagged) return "destructive";
-    if (!product.is_verified) return "secondary";
-    return "default";
+    const isHealthy =
+      product.is_active &&
+      !product.is_flagged &&
+      product.is_verified &&
+      !product.is_sold;
+
+    return isHealthy ? "success" : "destructive";
   };
 
   const getStatusText = (product) => {
@@ -137,28 +147,26 @@ function Products() {
   return (
     <AdminLayout>
       <div className="space-y-6">
-        {/* <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-[#0B0B0D]">Products</h1>
+            <h1 className="text-3xl font-bold text-secondary">Products</h1>
             <p className="text-muted-foreground mt-1">Manage your product inventory</p>
           </div>
-        </div> */}
+          <div className="relative w-full max-w-sm md:max-w-xs">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search products..."
+              className="pl-10 bg-background"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setPage(1);
+              }}
+            />
+          </div>
+        </div>
         <Card>
           <CardContent className="p-6">
-            <div className="flex items-center gap-4 mb-6">
-              <div className="relative max-w-md">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search products..."
-                  className="pl-10 bg-background"
-                  value={searchQuery}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value);
-                    setPage(1);
-                  }}
-                />
-              </div>
-            </div>
             {loading ? (
               <div className="space-y-4">
                 {[1, 2, 3, 4, 5].map((i) => (
@@ -261,14 +269,51 @@ function Products() {
 
       {/* Edit Product Dialog */}
       <Dialog open={!!editProduct} onOpenChange={() => setEditProduct(null)}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md" onOpenAutoFocus={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>Edit Product Status</DialogTitle>
           </DialogHeader>
           {editProduct && (
             <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label>Product: {editProduct.title}</Label>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-2">
+                  <Label htmlFor="product-name">Product Name</Label>
+                  <Input
+                    id="product-name"
+                    value={editProduct.title || ""}
+                    onChange={(e) => setEditProduct({ ...editProduct, title: e.target.value })}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="product-price">Price</Label>
+                  <Input
+                    id="product-price"
+                    type="number"
+                    step="0.01"
+                    value={editProduct.price ?? ""}
+                    onChange={(e) => setEditProduct({ ...editProduct, price: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-2">
+                  <Label htmlFor="product-condition">Condition</Label>
+                  <Select
+                    value={editProduct.condition || ""}
+                    onValueChange={(value) => setEditProduct({ ...editProduct, condition: value })}
+                  >
+                    <SelectTrigger id="product-condition">
+                      <SelectValue placeholder="Select condition" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CONDITIONS.map((condition) => (
+                        <SelectItem key={condition.value} value={condition.value}>
+                          {condition.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               <div className="flex items-center justify-between">
                 <Label htmlFor="is-active">Active</Label>
@@ -286,22 +331,22 @@ function Products() {
                   onCheckedChange={(checked) => setEditProduct({ ...editProduct, is_verified: checked })}
                 />
               </div>
-              <div className="flex items-center justify-between">
+              {/* <div className="flex items-center justify-between">
                 <Label htmlFor="is-flagged">Flagged</Label>
                 <Switch
                   id="is-flagged"
                   checked={editProduct.is_flagged}
                   onCheckedChange={(checked) => setEditProduct({ ...editProduct, is_flagged: checked })}
                 />
-              </div>
-              <div className="flex items-center justify-between">
+              </div> */}
+              {/* <div className="flex items-center justify-between">
                 <Label htmlFor="is-featured">Featured</Label>
                 <Switch
                   id="is-featured"
                   checked={editProduct.is_featured}
                   onCheckedChange={(checked) => setEditProduct({ ...editProduct, is_featured: checked })}
                 />
-              </div>
+              </div> */}
               <div className="flex justify-end gap-2 pt-4">
                 <Button variant="outline" onClick={() => setEditProduct(null)}>
                   Cancel

@@ -47,6 +47,11 @@ const mockPayoutRequests = [
   },
 ];
 
+const STATUS_SUCCESS_STATES = ["approved", "paid", "completed"];
+
+const getStatusBadgeVariant = (status) =>
+  STATUS_SUCCESS_STATES.includes((status || "").toLowerCase()) ? "success" : "destructive";
+
 function Payouts() {
   const [searchTerm, setSearchTerm] = useState("");
   const [rejectReasons, setRejectReasons] = useState({});
@@ -69,20 +74,22 @@ function Payouts() {
   return (
     <AdminLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-[#0B0B0D]">
-            Payout Requests
-          </h1>
-          <p className="text-muted-foreground">Review and approve seller payout requests</p>
-        </div>
-        <div className="relative max-w-md">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-          <Input
-            placeholder="Search payout requests..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-secondary">
+              Payout Requests
+            </h1>
+            <p className="text-muted-foreground">Review and approve seller payout requests</p>
+          </div>
+          <div className="relative w-full max-w-sm md:max-w-xs">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+            <Input
+              placeholder="Search payout requests..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
         </div>
         <div className="grid gap-4">
           {mockPayoutRequests.map((payout) => (
@@ -102,7 +109,7 @@ function Payouts() {
                       </div>
                     </div>
                   </div>
-                  <Badge variant="secondary" className="capitalize">
+                  <Badge variant={getStatusBadgeVariant(payout.status)} className="capitalize">
                     {payout.status}
                   </Badge>
                 </div>

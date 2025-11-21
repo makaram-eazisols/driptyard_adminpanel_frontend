@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -123,13 +123,15 @@ const Sidebar = React.forwardRef(({ side = "left", variant = "sidebar", collapsi
         <SheetContent
           data-sidebar="sidebar"
           data-mobile="true"
-          className="w-[--sidebar-width] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
+          className="w-[--sidebar-width] bg-card p-0 text-foreground [&>button]:hidden border-r border-border"
           style={{
             "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
           }}
           side={side}
         >
-          <div className="flex h-full w-full flex-col">{children}</div>
+          <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
+          <SheetDescription className="sr-only">Main navigation menu for the admin dashboard</SheetDescription>
+          <div className="flex h-full w-full flex-col bg-card">{children}</div>
         </SheetContent>
       </Sheet>
     );
@@ -188,7 +190,7 @@ const SidebarTrigger = React.forwardRef(({ className, onClick, ...props }, ref) 
       data-sidebar="trigger"
       variant="ghost"
       size="icon"
-      className={cn("h-7 w-7", className)}
+      className={cn("h-7 w-7 hover:text-accent", className)}
       onClick={(event) => {
         onClick?.(event);
         toggleSidebar();

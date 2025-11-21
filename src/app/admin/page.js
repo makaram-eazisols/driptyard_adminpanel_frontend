@@ -17,6 +17,8 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 
+const SUCCESS_ORDER_STATUSES = ["completed", "shipped", "delivered", "paid"];
+
 const recentOrders = [
   { id: "ORD001", customer: "John Doe", product: "Luxury Watch", amount: "$1,299", status: "completed" },
   { id: "ORD002", customer: "Jane Smith", product: "Designer Shirt", amount: "$89", status: "pending" },
@@ -65,7 +67,7 @@ export default function Dashboard() {
     <AdminLayout>
       <div className="space-y-6">
         {/* <div>
-          <h1 className="text-3xl font-bold text-[#0B0B0D]">Dashboard</h1>
+          <h1 className="text-3xl font-bold text-secondary">Dashboard</h1>
           <p className="text-muted-foreground mt-1">Welcome back! Here's what's happening today.</p>
         </div> */}
         {/* {loading ? (
@@ -111,8 +113,8 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card>
             <CardHeader className="p-3 pb-0">
-              <CardTitle className="flex items-center gap-2 text-lg font-bold text-primary">
-                <ShoppingBag className="h-5 w-5 text-primary" strokeWidth={2.5} />
+              <CardTitle className="flex items-center gap-2 text-lg font-bold">
+                <ShoppingBag className="h-5 w-5" strokeWidth={2.5} />
                 Recent Orders
               </CardTitle>
             </CardHeader>
@@ -140,11 +142,9 @@ export default function Dashboard() {
                       <TableCell className="p-3 text-right">
                         <Badge
                           variant={
-                            order.status === "completed"
+                            SUCCESS_ORDER_STATUSES.includes((order.status || "").toLowerCase())
                               ? "success"
-                              : order.status === "pending"
-                              ? "secondary"
-                              : "outline"
+                              : "destructive"
                           }
                         >
                           {order.status}
@@ -157,14 +157,14 @@ export default function Dashboard() {
             </CardContent>
           </Card>
           <Card>
-            <CardHeader>
+            <CardHeader className="p-3 pb-0">
               <CardTitle className="flex items-center gap-2 text-lg font-bold">
-                <TrendingUp className="h-5 w-5 text-accent" strokeWidth={2.5} />
+                <TrendingUp className="h-5 w-5" strokeWidth={2.5} />
                 Top Products
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
+              <div className="space-y-4 mt-2">
                 {topProducts.map((product, index) => (
                   <div
                     key={product.name}

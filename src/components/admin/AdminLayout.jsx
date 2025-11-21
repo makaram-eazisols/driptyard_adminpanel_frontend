@@ -12,12 +12,12 @@ const LayoutContent = ({ children }) => {
   return (
     <SidebarInset 
       className={cn(
-        "transition-all duration-200 ease-linear",
+        "flex flex-col h-screen transition-all duration-200 ease-linear",
         isExpanded && "md:ml-[var(--sidebar-width)]"
       )}
     >
       <AdminHeader />
-      <main className="flex-1 p-6">
+      <main className="flex-1 overflow-y-auto p-6">
         {children}
       </main>
     </SidebarInset>
