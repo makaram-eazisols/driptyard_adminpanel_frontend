@@ -1,169 +1,352 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminLayout } from "@/components/admin/AdminLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Search, Star, Plus, X } from "lucide-react";
+import { Star, ChevronLeft, ChevronRight, Filter, X } from "lucide-react";
+import { apiClient } from "@/lib/api-client";
+import { useToast } from "@/hooks/use-toast";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
 
-// Mock data
-const mockSpotlightProducts = [
-  {
-    id: "1",
-    title: "Nike Air Jordan 1 Retro",
-    seller: "john.doe@example.com",
-    price: "$299",
-    boostedUntil: "2024-01-20",
-    views: "2,450",
-    image: "/placeholder.svg"
-  },
-  {
-    id: "2",
-    title: "Supreme Box Logo Hoodie",
-    seller: "jane.smith@example.com",
-    price: "$450",
-    boostedUntil: "2024-01-18",
-    views: "1,890",
-    image: "/placeholder.svg"
-  },
-];
-
-const mockAvailableProducts = [
-  {
-    id: "3",
-    title: "Yeezy Boost 350",
-    seller: "user@example.com",
-    price: "$350",
-    image: "/placeholder.svg"
-  },
-  {
-    id: "4",
-    title: "Off-White Presto",
-    seller: "seller@example.com",
-    price: "$500",
-    image: "/placeholder.svg"
-  },
+const STATUS_OPTIONS = [
+  { value: "all", label: "All Status" },
+  { value: "applied", label: "Applied" },
+  { value: "removed", label: "Removed" },
+  { value: "expired", label: "Expired" },
 ];
 
 function Spotlight() {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [duration, setDuration] = useState("7");
+  const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [pageSize, setPageSize] = useState(20);
+  const [productId, setProductId] = useState("");
+  const [status, setStatus] = useState("all");
+  const [dateFrom, setDateFrom] = useState(null);
+  const [dateTo, setDateTo] = useState(null);
+  const [showFilters, setShowFilters] = useState(false);
+  const { toast } = useToast();
 
-  const handleAddToSpotlight = (productId) => {
-    console.log("Adding to spotlight:", productId, "Duration:", duration);
-    // TODO: Call API
+  const fetchHistory = async () => {
+    try {
+      setLoading(true);
+      const params = {
+        page,
+        page_size: pageSize,
+      };
+
+      if (productId) {
+        params.product_id = productId;
+      }
+
+      if (status && status !== "all") {
+        params.status = status;
+      }
+
+      if (dateFrom) {
+        const fromDate = new Date(dateFrom);
+        fromDate.setHours(0, 0, 0, 0);
+        params.date_from = fromDate.toISOString();
+      }
+
+      if (dateTo) {
+        const toDate = new Date(dateTo);
+        toDate.setHours(23, 59, 59, 999);
+        params.date_to = toDate.toISOString();
+      }
+
+      const data = await apiClient.getSpotlightHistory(params);
+      setHistory(data.history || []);
+      setTotalPages(data.total_pages || 1);
+      setTotalCount(data.total || 0);
+      setPageSize(data.page_size || 20);
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to load spotlight history",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleRemoveFromSpotlight = (productId) => {
-    console.log("Removing from spotlight:", productId);
-    // TODO: Call API
+  useEffect(() => {
+    fetchHistory();
+  }, [page, productId, status, dateFrom, dateTo]);
+
+  const handleClearFilters = () => {
+    setProductId("");
+    setStatus("all");
+    setDateFrom(null);
+    setDateTo(null);
+    setPage(1);
   };
+
+  const getStatusBadge = (item) => {
+    const action = item.action?.toLowerCase() || "";
+    if (action === "applied") {
+      return <Badge variant="success" className="text-xs">Applied</Badge>;
+    }
+    if (action === "removed" || action === "expired") {
+      return <Badge variant="destructive" className="text-xs">{action.charAt(0).toUpperCase() + action.slice(1)}</Badge>;
+    }
+    return <Badge variant="outline" className="text-xs">{action || "—"}</Badge>;
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return "—";
+    try {
+      return format(new Date(dateString), "MMM dd, yyyy HH:mm");
+    } catch {
+      return dateString;
+    }
+  };
+
+
+  const hasActiveFilters = productId || (status && status !== "all") || dateFrom || dateTo;
 
   return (
     <AdminLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-secondary">
-            Admin Spotlight
-          </h1>
-          <p className="text-muted-foreground">Manually feature and boost product listings</p>
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-secondary">Spotlight History</h1>
+            <p className="text-muted-foreground mt-1">View and manage spotlight application history</p>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowFilters(!showFilters)}
+              className="flex items-center gap-2"
+            >
+              <Filter className="h-4 w-4" />
+              Filters
+              {hasActiveFilters && (
+                <Badge variant="secondary" className="ml-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs">
+                  {[productId, status && status !== "all" ? status : null, dateFrom, dateTo].filter(Boolean).length}
+                </Badge>
+              )}
+            </Button>
+            {hasActiveFilters && (
+              <Button variant="ghost" size="sm" onClick={handleClearFilters}>
+                <X className="h-4 w-4 mr-2" />
+                Clear
+              </Button>
+            )}
+          </div>
         </div>
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Star className="h-5 w-5 text-primary" />
-              Active Spotlight Products
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {mockSpotlightProducts.map((product) => (
-              <div key={product.id} className="flex items-center gap-4 p-4 border rounded-lg">
-                <img
-                  src={product.image}
-                  alt={product.title}
-                  className="w-16 h-16 rounded-lg object-cover bg-muted"
-                />
-                <div className="flex-1 space-y-1">
-                  <h3 className="font-semibold">{product.title}</h3>
-                  <p className="text-sm text-muted-foreground">Seller: {product.seller}</p>
-                  <div className="flex items-center gap-4 text-sm">
-                    <span className="font-medium text-primary">{product.price}</span>
-                    <span className="text-muted-foreground">Views: {product.views}</span>
-                    <Badge variant="secondary">Until {product.boostedUntil}</Badge>
-                  </div>
-                </div>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => handleRemoveFromSpotlight(product.id)}
-                >
-                  <X className="h-4 w-4 mr-2" />
-                  Remove
-                </Button>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Add Product to Spotlight</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex gap-4 items-end">
-              <div className="relative max-w-md">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+
+        {/* Filters */}
+        {showFilters && (
+          <div className="rounded-lg border border-border bg-background p-4 space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="product-id">Product ID</Label>
                 <Input
-                  placeholder="Search products..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
+                  id="product-id"
+                  placeholder="Enter product ID"
+                  value={productId}
+                  onChange={(e) => {
+                    setProductId(e.target.value);
+                    setPage(1);
+                  }}
                 />
               </div>
-              <div className="w-48 space-y-2">
-                <Label htmlFor="duration" className="text-sm font-medium">
-                  Spotlight Duration (days)
-                </Label>
-                <Input
-                  id="duration"
-                  type="number"
-                  min="1"
-                  max="30"
-                  value={duration}
-                  onChange={(e) => setDuration(e.target.value)}
-                />
+              <div className="space-y-2">
+                <Label htmlFor="status">Status</Label>
+                <Select value={status} onValueChange={(value) => {
+                  setStatus(value);
+                  setPage(1);
+                }}>
+                  <SelectTrigger id="status">
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STATUS_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Date From</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start text-left font-normal border-border bg-background text-foreground hover:border-[#E0B74F] hover:bg-background hover:text-foreground transition-colors"
+                    >
+                      {dateFrom ? format(dateFrom, "PPP") : "Select date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={dateFrom}
+                      onSelect={(date) => {
+                        setDateFrom(date);
+                        setPage(1);
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div className="space-y-2">
+                <Label>Date To</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start text-left font-normal border-border bg-background text-foreground hover:border-[#E0B74F] hover:bg-background hover:text-foreground transition-colors"
+                    >
+                      {dateTo ? format(dateTo, "PPP") : "Select date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={dateTo}
+                      onSelect={(date) => {
+                        setDateTo(date);
+                        setPage(1);
+                      }}
+                      disabled={(date) => dateFrom && date < dateFrom}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
-            <div className="space-y-2">
-              {mockAvailableProducts.map((product) => (
-                <div key={product.id} className="flex items-center gap-4 p-4 border rounded-lg">
-                  <img
-                    src={product.image}
-                    alt={product.title}
-                    className="w-12 h-12 rounded-lg object-cover bg-muted"
-                  />
-                  <div className="flex-1">
-                    <h4 className="font-medium">{product.title}</h4>
-                    <p className="text-sm text-muted-foreground">
-                      {product.seller} • {product.price}
-                    </p>
-                  </div>
-                  <Button
-                    className="gradient-driptyard-hover text-white"
-                    size="sm"
-                    onClick={() => handleAddToSpotlight(product.id)}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add to Spotlight
-                  </Button>
-                </div>
+          </div>
+        )}
+
+        {/* History Table */}
+        <div className="rounded-lg border border-border overflow-hidden">
+          {loading ? (
+            <div className="space-y-4 p-4">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <Skeleton key={i} className="h-16 w-full" />
               ))}
             </div>
-          </CardContent>
-        </Card>
+          ) : history.length === 0 ? (
+            <div className="text-center py-12">
+              <Star className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground">No spotlight history found</p>
+            </div>
+          ) : (
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/50 hover:bg-muted/50">
+                    <TableHead className="h-12 px-4 font-semibold text-secondary">Product</TableHead>
+                    <TableHead className="h-12 px-4 font-semibold text-secondary">Seller</TableHead>
+                    <TableHead className="h-12 px-4 font-semibold text-secondary">Applied At</TableHead>
+                    <TableHead className="h-12 px-4 font-semibold text-secondary">End Time</TableHead>
+                    <TableHead className="h-12 px-4 font-semibold text-secondary">Duration</TableHead>
+                    <TableHead className="h-12 px-4 font-semibold text-secondary">Applied By</TableHead>
+                    <TableHead className="h-12 px-4 font-semibold text-secondary">Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {history.map((item) => {
+                    return (
+                      <TableRow key={item.id || item.spotlight_id} className="hover:bg-muted/30 transition-colors">
+                        <TableCell className="py-3 px-4">
+                          <div className="flex items-center gap-3">
+                            <div className="h-12 w-12 rounded-lg border border-border overflow-hidden bg-muted/50 shadow-sm flex-shrink-0">
+                              {item.product_image ? (
+                                <img
+                                  src={item.product_image}
+                                  alt={item.product_title || "Product"}
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                <div className="flex h-full w-full items-center justify-center text-[10px] font-medium text-muted-foreground">
+                                  No Image
+                                </div>
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-semibold text-sm text-primary leading-tight truncate">
+                                {item.product_title || "Untitled listing"}
+                              </p>
+                              <p className="text-xs text-muted-foreground">ID: {item.product_id || "—"}</p>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-3 px-4">
+                          <p className="text-sm text-foreground">@{item.seller_username || "—"}</p>
+                        </TableCell>
+                        <TableCell className="py-3 px-4">
+                          <p className="text-sm text-foreground">{formatDate(item.start_time || item.created_at)}</p>
+                        </TableCell>
+                        <TableCell className="py-3 px-4">
+                          <p className="text-sm text-foreground">{formatDate(item.end_time)}</p>
+                        </TableCell>
+                        <TableCell className="py-3 px-4">
+                          <p className="text-sm text-foreground">
+                            {item.duration_hours ? `${item.duration_hours} hours` : "—"}
+                          </p>
+                        </TableCell>
+                        <TableCell className="py-3 px-4">
+                          <p className="text-sm text-foreground">@{item.applied_by_username || "—"}</p>
+                        </TableCell>
+                        <TableCell className="py-3 px-4">
+                          {getStatusBadge(item)}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+              {totalPages > 1 && (
+                <div className="flex justify-end mt-4 p-4 border-t border-border">
+                  <div className="inline-flex items-center divide-x divide-border rounded-xl border border-border bg-background shadow-sm">
+                    <div className="px-4 py-2 text-sm font-medium">
+                      <span className="text-primary">
+                        {totalCount === 0
+                          ? "0"
+                          : `${(page - 1) * pageSize + 1}-${Math.min(page * pageSize, totalCount)}`}
+                      </span>
+                      <span className="ml-1 text-muted-foreground">of {totalCount}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      disabled={page === 1}
+                      className="h-10 w-10 flex items-center justify-center text-muted-foreground hover:text-primary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={page === totalPages}
+                      className="h-10 w-10 flex items-center justify-center text-muted-foreground hover:text-primary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
     </AdminLayout>
   );

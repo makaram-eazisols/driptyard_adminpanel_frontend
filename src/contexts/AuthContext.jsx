@@ -114,7 +114,20 @@ export const AuthProvider = ({ children }) => {
       setUser(mappedUser);
     } catch (error) {
       console.error("Login failed:", error);
-      throw new Error(error.response?.data?.detail || error.message || "Login failed");
+      const responseData = error.response?.data;
+      const apiMessage =
+        responseData?.detail ||
+        responseData?.message ||
+        responseData?.error ||
+        (typeof responseData === "string" ? responseData : null);
+      const fallbackByStatus =
+        error.response?.status === 401 ? "Invalid email or password" : null;
+      const finalMessage =
+        apiMessage ||
+        fallbackByStatus ||
+        error.message ||
+        "Login failed";
+      throw new Error(finalMessage);
     } finally {
       setIsLoading(false);
     }

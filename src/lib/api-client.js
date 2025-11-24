@@ -274,6 +274,26 @@ class ApiClient {
     return response.data;
   }
 
+  async addProductToSpotlight(productId, data) {
+    const response = await this.client.post(`/admin/products/${productId}/spotlight`, data);
+    return response.data;
+  }
+
+  async getProductSpotlight(productId) {
+    const response = await this.client.get(`/products/${productId}/spotlight`);
+    return response.data;
+  }
+
+  async removeProductSpotlight(productId) {
+    const response = await this.client.delete(`/admin/products/${productId}/spotlight`);
+    return response.data;
+  }
+
+  async getSpotlightHistory(params) {
+    const response = await this.client.get("/admin/spotlight/history", { params });
+    return response.data;
+  }
+
   // ============ ADMIN USER ENDPOINTS ============
   async getAdminUsers(params) {
     const response = await this.client.get("/admin/users", { params });

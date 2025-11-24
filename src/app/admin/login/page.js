@@ -25,6 +25,7 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
+  const [serverError, setServerError] = useState("");
 
   useEffect(() => {
     if (isAuthenticated && !isLoading) {
@@ -35,6 +36,7 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrors({});
+    setServerError("");
 
     // Validate inputs
     const result = loginSchema.safeParse({ email, password });
@@ -58,9 +60,11 @@ export default function Login() {
       });
       router.push("/admin");
     } catch (error) {
+      const message = error.message || "Invalid email or password. Please try again.";
+      setServerError(message);
       toast({
         title: "Login failed",
-        description: error.message || "Invalid email or password. Please try again.",
+        description: message,
         variant: "destructive",
       });
     } finally {
@@ -152,6 +156,9 @@ export default function Login() {
                 "Sign In"
               )}
             </Button>
+            {serverError && (
+              <p className="text-sm text-destructive text-center">{serverError}</p>
+            )}
           </form>
         </CardContent>
       </Card>

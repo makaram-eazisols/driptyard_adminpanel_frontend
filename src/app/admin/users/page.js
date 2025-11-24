@@ -3,19 +3,18 @@
 import { useState, useEffect } from "react";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminLayout } from "@/components/admin/AdminLayout";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Edit2, Trash2, Loader2, MoreVertical } from "lucide-react";
+import { Search, Edit2, Trash2, Loader2, MoreVertical, ChevronLeft, ChevronRight } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -40,6 +39,8 @@ function Users() {
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
   const [editUser, setEditUser] = useState(null);
   const [deleteUserId, setDeleteUserId] = useState(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -62,6 +63,8 @@ function Users() {
       const nonAdminUsers = (data.users || []).filter((user) => !user.is_admin);
       setUsers(nonAdminUsers);
       setTotalPages(data.total_pages || 1);
+      setTotalCount(data.total || nonAdminUsers.length || 0);
+      setPageSize(data.page_size || 10);
     } catch (error) {
       toast({
         title: "Error",
@@ -162,109 +165,105 @@ function Users() {
             />
           </div>
         </div>
-        <Card>
-          <CardContent className="p-6">
-            {loading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              </div>
-            ) : (
-              <>
+        <div>
+          {loading ? (
+            <div className="space-y-4">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <Skeleton key={i} className="h-16 w-full" />
+              ))}
+            </div>
+          ) : users.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">No users found</p>
+            </div>
+          ) : (
+            <>
+              <div className="rounded-lg border border-border overflow-hidden">
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead className="p-0">User Name</TableHead>
-                      <TableHead className="p-0">Email</TableHead>
-                      <TableHead className="p-0">Status</TableHead>
-                      <TableHead className="p-0">Joined</TableHead>
-                      <TableHead className="p-0 text-right">Actions</TableHead>
+                    <TableRow className="bg-muted/50 hover:bg-muted/50">
+                      <TableHead className="h-12 px-4 font-semibold text-secondary">User Name</TableHead>
+                      <TableHead className="h-12 px-4 font-semibold text-secondary">Email</TableHead>
+                      <TableHead className="h-12 px-4 font-semibold text-secondary">Status</TableHead>
+                      <TableHead className="h-12 px-4 font-semibold text-secondary">Joined</TableHead>
+                      <TableHead className="h-12 px-4 text-right font-semibold text-secondary">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {users.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                          No users found
+                    {users.map((user) => (
+                      <TableRow key={user.id} className="hover:bg-muted/30 transition-colors">
+                        <TableCell className="py-3 px-4">
+                          <p className="font-semibold text-sm text-primary leading-tight">{user?.username || "Unknown User"}</p>
+                        </TableCell>
+                        <TableCell className="py-3 px-4">
+                          <p className="text-sm text-foreground">{user.email}</p>
+                        </TableCell>
+                        <TableCell className="py-3 px-4">
+                          <Badge variant={getStatusBadgeVariant(user)} className="text-xs">{getStatusText(user)}</Badge>
+                        </TableCell>
+                        <TableCell className="py-3 px-4">
+                          <p className="text-sm text-foreground">{format(new Date(user.created_at), "MMM dd, yyyy")}</p>
+                        </TableCell>
+                        <TableCell className="py-3 px-4 text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem className="cursor-pointer" onClick={() => handleEditUser(user)}>
+                                <Edit2 className="h-4 w-4 mr-2" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="text-destructive cursor-pointer focus:text-destructive"
+                                onClick={() => setDeleteUserId(user.id)}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
                       </TableRow>
-                    ) : (
-                      users.map((user) => (
-                        <TableRow key={user.id}>
-                          <TableCell className="p-0">
-                            <div className="flex items-center gap-3">
-                              {/* <Avatar>
-                                {user.avatar_url && <AvatarImage src={user.avatar_url} />}
-                                <AvatarFallback className="gradient-driptyard text-white">
-                                  {user.first_name?.[0]?.toUpperCase()}
-                                  {user.last_name?.[0]?.toUpperCase() || user.username?.[0]?.toUpperCase() || "U"}
-                                </AvatarFallback>
-                              </Avatar> */}
-                              <div>
-                                <div className="font-medium">
-                                  {/* {user.first_name} {user.last_name} */}
-                                  {user?.username}
-                                </div>
-                                {/* <div className="text-xs text-muted-foreground">{user.username}</div> */}
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell className="p-0 text-muted-foreground">{user.email}</TableCell>
-                          <TableCell className="p-0">
-                            <Badge variant={getStatusBadgeVariant(user)}>{getStatusText(user)}</Badge>
-                          </TableCell>
-                          <TableCell className="p-0">{format(new Date(user.created_at), "MMM dd, yyyy")}</TableCell>
-                          <TableCell className="p-0 text-right">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon">
-                                  <MoreVertical className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem className="cursor-pointer" onClick={() => handleEditUser(user)}>
-                                  <Edit2 className="h-4 w-4 mr-2" />
-                                  Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  className="text-destructive cursor-pointer focus:text-destructive"
-                                  onClick={() => setDeleteUserId(user.id)}
-                                >
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
+                    ))}
                   </TableBody>
                 </Table>
-                {totalPages > 1 && (
-                  <div className="flex items-center justify-between mt-4">
-                    <Button
-                      variant="outline"
+              </div>
+              {totalPages > 1 && (
+                <div className="flex justify-end mt-8">
+                  <div className="inline-flex items-center divide-x divide-border rounded-xl border border-border bg-background shadow-sm">
+                    <div className="px-4 py-2 text-sm font-medium">
+                      <span className="text-primary">
+                        {totalCount === 0
+                          ? "0"
+                          : `${(currentPage - 1) * pageSize + 1}-${Math.min(currentPage * pageSize, totalCount)}`}
+                      </span>
+                      <span className="ml-1 text-muted-foreground">of {totalCount}</span>
+                    </div>
+                    <button
+                      type="button"
                       onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                       disabled={currentPage === 1}
+                      className="h-10 w-10 flex items-center justify-center text-muted-foreground hover:text-primary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                     >
-                      Previous
-                    </Button>
-                    <span className="text-sm text-muted-foreground">
-                      Page {currentPage} of {totalPages}
-                    </span>
-                    <Button
-                      variant="outline"
+                      <ChevronLeft className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                       disabled={currentPage === totalPages}
+                      className="h-10 w-10 flex items-center justify-center text-muted-foreground hover:text-primary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                     >
-                      Next
-                    </Button>
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
                   </div>
-                )}
-              </>
-            )}
-          </CardContent>
-        </Card>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
 
       {/* Edit User Dialog */}
