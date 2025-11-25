@@ -34,3 +34,16 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Toast Notifications
+
+Legacy screens still rely on the in-house `toast.jsx`/`Toaster.jsx` components. New screens should use [`react-toastify`](https://github.com/fkhadra/react-toastify) via the helpers in `src/lib/toast.js`, e.g.:
+
+```tsx
+import { notifySuccess, notifyError } from "@/lib/toast";
+
+notifySuccess("Saved!");
+notifyError("Something went wrong");
+```
+
+The shared `<ToastContainer>` is rendered once in `src/app/layout.js`, so you do not need to add it per page.

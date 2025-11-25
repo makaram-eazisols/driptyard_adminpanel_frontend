@@ -13,13 +13,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Mail, Send, CheckCircle, Eye, EyeOff, Lock, Loader2, AlertCircle } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api-client";
 import { useAuth } from "@/hooks/use-auth";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { notifySuccess } from "@/lib/toast";
 
 function Settings() {
-  const { toast } = useToast();
   const { user } = useAuth();
   const [emailProvider, setEmailProvider] = useState("smtp");
   const [testEmail, setTestEmail] = useState("");
@@ -40,17 +39,11 @@ function Settings() {
   const [errorMessage, setErrorMessage] = useState("");
 
   const handleTestEmail = () => {
-    toast({
-      title: "Test Email Sent",
-      description: `A test email has been sent to ${testEmail}`,
-    });
+    notifySuccess(`A test email has been sent to ${testEmail}`);
   };
 
   const handleSaveEmailSettings = () => {
-    toast({
-      title: "Email Settings Saved",
-      description: "Your email configuration has been updated successfully.",
-    });
+    notifySuccess("Your email configuration has been updated successfully.");
   };
 
   const handleChangePassword = async () => {
@@ -78,8 +71,8 @@ function Settings() {
       return;
     }
 
-    if (newPassword.length > 100) {
-      setPasswordErrors({ newPassword: "Password must be at most 100 characters" });
+    if (newPassword.length > 15) {
+      setPasswordErrors({ newPassword: "Password must be at most 15 characters" });
       return;
     }
     
@@ -100,10 +93,7 @@ function Settings() {
         newPassword,
         currentPassword
       );
-      toast({
-        title: "Success",
-        description: "Your password has been reset successfully.",
-      });
+      notifySuccess("Your password has been reset successfully.");
       // Clear form
       setCurrentPassword("");
       setNewPassword("");
@@ -150,8 +140,8 @@ function Settings() {
             {errorMessage && (
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Error</AlertTitle>
-                <AlertDescription>{errorMessage}</AlertDescription>
+                <AlertTitle style={{ color: "#E74C3C" }}>Error</AlertTitle>
+                <AlertDescription style={{ color: "#E74C3C" }}>{errorMessage}</AlertDescription>
               </Alert>
             )}
             <div className="space-y-2">
@@ -162,8 +152,17 @@ function Settings() {
                   type={showCurrentPassword ? "text" : "password"}
                   placeholder="Enter your current password"
                   value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                  className={passwordErrors.currentPassword ? "border-destructive pr-10" : "pr-10"}
+                  onChange={(e) => {
+                    setCurrentPassword(e.target.value);
+                    if (passwordErrors.currentPassword) {
+                      setPasswordErrors((prev) => ({ ...prev, currentPassword: undefined }));
+                    }
+                    if (errorMessage) {
+                      setErrorMessage("");
+                    }
+                  }}
+                  className="pr-10"
+                  style={passwordErrors.currentPassword ? { borderColor: "#E74C3C" } : {}}
                   disabled={isChangingPassword}
                 />
                 <button
@@ -180,7 +179,7 @@ function Settings() {
                 </button>
               </div>
               {passwordErrors.currentPassword && (
-                <p className="text-sm text-destructive">{passwordErrors.currentPassword}</p>
+                <p className="text-sm" style={{ color: "#E74C3C" }}>{passwordErrors.currentPassword}</p>
               )}
             </div>
             <div className="space-y-2">
@@ -191,8 +190,20 @@ function Settings() {
                   type={showNewPassword ? "text" : "password"}
                   placeholder="Enter your new password"
                   value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className={passwordErrors.newPassword ? "border-destructive pr-10" : "pr-10"}
+                  onChange={(e) => {
+                    setNewPassword(e.target.value);
+                    if (passwordErrors.newPassword) {
+                      setPasswordErrors((prev) => ({ ...prev, newPassword: undefined }));
+                    }
+                    if (passwordErrors.confirmPassword && e.target.value === confirmPassword) {
+                      setPasswordErrors((prev) => ({ ...prev, confirmPassword: undefined }));
+                    }
+                    if (errorMessage) {
+                      setErrorMessage("");
+                    }
+                  }}
+                  className="pr-10"
+                  style={passwordErrors.newPassword ? { borderColor: "#E74C3C" } : {}}
                   disabled={isChangingPassword}
                 />
                 <button
@@ -209,10 +220,10 @@ function Settings() {
                 </button>
               </div>
               {passwordErrors.newPassword && (
-                <p className="text-sm text-destructive">{passwordErrors.newPassword}</p>
+                <p className="text-sm" style={{ color: "#E74C3C" }}>{passwordErrors.newPassword}</p>
               )}
               <p className="text-sm text-muted-foreground">
-                Password must be between 8 and 100 characters long
+                Password must be between 8 and 15 characters long
               </p>
             </div>
             <div className="space-y-2">
@@ -223,8 +234,17 @@ function Settings() {
                   type={showConfirmPassword ? "text" : "password"}
                   placeholder="Confirm your new password"
                   value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className={passwordErrors.confirmPassword ? "border-destructive pr-10" : "pr-10"}
+                  onChange={(e) => {
+                    setConfirmPassword(e.target.value);
+                    if (passwordErrors.confirmPassword) {
+                      setPasswordErrors((prev) => ({ ...prev, confirmPassword: undefined }));
+                    }
+                    if (errorMessage) {
+                      setErrorMessage("");
+                    }
+                  }}
+                  className="pr-10"
+                  style={passwordErrors.confirmPassword ? { borderColor: "#E74C3C" } : {}}
                   disabled={isChangingPassword}
                 />
                 <button
@@ -241,7 +261,7 @@ function Settings() {
                 </button>
               </div>
               {passwordErrors.confirmPassword && (
-                <p className="text-sm text-destructive">{passwordErrors.confirmPassword}</p>
+                <p className="text-sm" style={{ color: "#E74C3C" }}>{passwordErrors.confirmPassword}</p>
               )}
             </div>
             <Button

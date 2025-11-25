@@ -29,11 +29,10 @@ import {
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { apiClient } from "@/lib/api-client";
-import { useToast } from "@/hooks/use-toast";
+import { notifyError, notifySuccess } from "@/lib/toast";
 import { format } from "date-fns";
 
 function Users() {
-  const { toast } = useToast();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -66,11 +65,7 @@ function Users() {
       setTotalCount(data.total || nonAdminUsers.length || 0);
       setPageSize(data.page_size || 10);
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to fetch users",
-        variant: "destructive",
-      });
+      notifyError("Failed to fetch users");
     } finally {
       setLoading(false);
     }
@@ -94,19 +89,12 @@ function Users() {
         is_active: editUser.is_active,
         is_verified: editUser.is_verified,
       });
-      toast({
-        title: "Success",
-        description: "User has been updated",
-      });
+      notifySuccess("User has been updated");
       setIsEditDialogOpen(false);
       setEditUser(null);
       fetchUsers();
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to update user",
-        variant: "destructive",
-      });
+      notifyError("Failed to update user");
     } finally {
       setEditLoading(false);
     }
@@ -117,18 +105,11 @@ function Users() {
 
     try {
       await apiClient.deleteAdminUser(deleteUserId);
-      toast({
-        title: "Success",
-        description: "User has been deleted",
-      });
+      notifySuccess("User has been deleted");
       setDeleteUserId(null);
       fetchUsers();
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to delete user",
-        variant: "destructive",
-      });
+      notifyError("Failed to delete user");
     }
   };
 
@@ -292,17 +273,20 @@ function Users() {
                   />
                 </div>
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" value={editUser.email || ""} disabled />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="username">Username</Label>
-                <Input
-                  id="username"
-                  value={editUser.username || ""}
-                  onChange={(e) => setEditUser({ ...editUser, username: e.target.value })}
-                />
+              <div className="grid gap-4 md:grid-cols-2">
+              
+                <div className="grid gap-2">
+                  <Label htmlFor="username">Username</Label>
+                  <Input
+                    id="username"
+                    value={editUser.username || ""}
+                    onChange={(e) => setEditUser({ ...editUser, username: e.target.value })}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input id="email" type="email" value={editUser.email || ""} disabled />
+                </div>
               </div>
               <div className="flex items-center justify-between">
                 <Label htmlFor="is-active">Active</Label>

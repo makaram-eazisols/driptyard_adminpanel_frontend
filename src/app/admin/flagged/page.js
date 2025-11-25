@@ -10,10 +10,9 @@ import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Flag, Search, CheckCircle, XCircle, Loader2, RotateCcw, Check } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
-import { useToast } from "@/hooks/use-toast";
+import { notifyError, notifySuccess } from "@/lib/toast";
 
 function FlaggedContent() {
-  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [flaggedContent, setFlaggedContent] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -71,11 +70,7 @@ function FlaggedContent() {
       setFlaggedContent(normalizedItems);
       setTotalPages(data.total_pages || 1);
     } catch (error) {
-      toast({
-        title: "Error",
-        description: error.response?.data?.detail || error.message || "Failed to fetch flagged content",
-        variant: "destructive",
-      });
+      notifyError(error.response?.data?.detail || error.message || "Failed to fetch flagged content");
       setFlaggedContent([]);
     } finally {
       setLoading(false);
@@ -91,17 +86,10 @@ function FlaggedContent() {
     try {
       setLoadingActions((prev) => ({ ...prev, [actionKey]: true }));
       await apiClient.approveReport(item.reportId);
-      toast({
-        title: "Success",
-        description: "Report has been approved and resolved",
-      });
+      notifySuccess("Report has been approved and resolved");
       fetchFlaggedContent();
     } catch (error) {
-      toast({
-        title: "Error",
-        description: error.response?.data?.detail || error.message || "Failed to approve report",
-        variant: "destructive",
-      });
+      notifyError(error.response?.data?.detail || error.message || "Failed to approve report");
     } finally {
       setLoadingActions((prev) => ({ ...prev, [actionKey]: false }));
     }
@@ -112,17 +100,10 @@ function FlaggedContent() {
     try {
       setLoadingActions((prev) => ({ ...prev, [actionKey]: true }));
       await apiClient.rejectReport(item.reportId);
-      toast({
-        title: "Success",
-        description: "Report has been rejected",
-      });
+      notifySuccess("Report has been rejected");
       fetchFlaggedContent();
     } catch (error) {
-      toast({
-        title: "Error",
-        description: error.response?.data?.detail || error.message || "Failed to reject report",
-        variant: "destructive",
-      });
+      notifyError(error.response?.data?.detail || error.message || "Failed to reject report");
     } finally {
       setLoadingActions((prev) => ({ ...prev, [actionKey]: false }));
     }
@@ -133,17 +114,10 @@ function FlaggedContent() {
     try {
       setLoadingActions((prev) => ({ ...prev, [actionKey]: true }));
       await apiClient.reviewReport(item.reportId);
-      toast({
-        title: "Success",
-        description: "Report has been reopened for review",
-      });
+      notifySuccess("Report has been reopened for review");
       fetchFlaggedContent();
     } catch (error) {
-      toast({
-        title: "Error",
-        description: error.response?.data?.detail || error.message || "Failed to reopen report",
-        variant: "destructive",
-      });
+      notifyError(error.response?.data?.detail || error.message || "Failed to reopen report");
     } finally {
       setLoadingActions((prev) => ({ ...prev, [actionKey]: false }));
     }

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useToast } from "@/hooks/use-toast";
+import { notifyError, notifySuccess } from "@/lib/toast";
 import { ShoppingCart, Loader2, Eye, EyeOff } from "lucide-react";
 import { z } from "zod";
 
@@ -19,7 +19,6 @@ const loginSchema = z.object({
 export default function Login() {
   const router = useRouter();
   const { login, isAuthenticated, isLoading } = useAuth();
-  const { toast } = useToast();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -54,25 +53,18 @@ export default function Login() {
     setIsSubmitting(true);
     try {
       await login(email, password);
-      toast({
-        title: "Login successful",
-        description: "Welcome back to the admin dashboard!",
-      });
+      notifySuccess("Welcome back to the admin dashboard!");
       router.push("/admin");
     } catch (error) {
       const message = error.message || "Invalid email or password. Please try again.";
       setServerError(message);
-      toast({
-        title: "Login failed",
-        description: message,
-        variant: "destructive",
-      });
+      notifyError(message);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (isLoading) {
+  if (isLoading && !isSubmitting) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-accent" />
@@ -138,9 +130,9 @@ export default function Login() {
                   )}
                 </button>
               </div>
-              {errors.password && (
+              {/* {errors.password && (
                 <p className="text-sm text-destructive">{errors.password}</p>
-              )}
+              )} */}
             </div>
             <Button
               type="submit"
@@ -156,9 +148,9 @@ export default function Login() {
                 "Sign In"
               )}
             </Button>
-            {serverError && (
+            {/* {serverError && (
               <p className="text-sm text-destructive text-center">{serverError}</p>
-            )}
+            )} */}
           </form>
         </CardContent>
       </Card>

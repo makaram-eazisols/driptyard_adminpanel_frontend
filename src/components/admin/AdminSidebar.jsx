@@ -87,8 +87,8 @@ export function AdminSidebar() {
                         isActive={item.children?.some((child) => pathname?.startsWith(child.url))}
                       >
                         <div className="flex items-center gap-3">
-                          <item.icon className="h-5 w-5" strokeWidth={2} />
-                          <span className="text-sm font-medium">{item.title}</span>
+                          <item.icon className="h-4 w-4" strokeWidth={2} />
+                          <span className="text-sm">{item.title}</span>
                         </div>
                         <ChevronRight
                           className={cn(
@@ -108,7 +108,8 @@ export function AdminSidebar() {
                                   <NavLink
                                     href={child.url}
                                     className={cn(
-                                      "flex items-center gap-2 rounded-md px-3 py-1.5 text-foreground/70 hover:bg-muted",
+                                      "flex items-center gap-2 rounded-md px-3 py-1.5 text-foreground/70",
+                                      !isChildActive && "hover:bg-muted",
                                       isChildActive && "bg-primary text-primary-foreground font-medium shadow-sm",
                                     )}
                                   >

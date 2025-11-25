@@ -161,7 +161,7 @@ export const AdminHeader = () => {
         </Popover>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="gap-2 hover:bg-muted rounded-lg px-3">
+            <Button variant="ghost" className="gap-2 hover:bg-muted rounded-lg px-3 hover:text-primary">
               <div className="w-8 h-8 rounded-full gradient-driptyard flex items-center justify-center shadow-md">
                 <UserCircle2 className="h-5 w-5 text-white" strokeWidth={2} />
               </div>

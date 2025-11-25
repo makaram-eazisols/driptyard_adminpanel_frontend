@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Search, MoreVertical, Edit2, Trash2, Loader2, ChevronLeft, ChevronRight, Star, X } from "lucide-react";
 import { format } from "date-fns";
 import { apiClient } from "@/lib/api-client";
-import { useToast } from "@/hooks/use-toast";
+import { notifyError, notifySuccess } from "@/lib/toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   AlertDialog,
@@ -61,7 +61,6 @@ function Products() {
   const [existingSpotlight, setExistingSpotlight] = useState(null);
   const [fetchingSpotlight, setFetchingSpotlight] = useState(false);
   const [removingSpotlight, setRemovingSpotlight] = useState(false);
-  const { toast } = useToast();
 
   const fetchProducts = async () => {
     try {
@@ -76,11 +75,7 @@ function Products() {
       setTotalCount(data.total || 0);
       setPageSize(data.page_size || 10);
     } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to load products",
-      });
+      notifyError("Failed to load products");
     } finally {
       setLoading(false);
     }
@@ -103,18 +98,11 @@ function Products() {
 
     try {
       await apiClient.deleteAdminProduct(deleteProductId);
-      toast({
-        title: "Success",
-        description: "Product deleted successfully",
-      });
+      notifySuccess("Product deleted successfully");
       setDeleteProductId(null);
       fetchProducts();
     } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to delete product",
-      });
+      notifyError("Failed to delete product");
     }
   };
 
@@ -130,18 +118,11 @@ function Products() {
         is_active: editProduct.is_active,
         is_verified: editProduct.is_verified,
       });
-      toast({
-        title: "Success",
-        description: "Product updated successfully",
-      });
+      notifySuccess("Product updated successfully");
       setEditProduct(null);
       fetchProducts();
     } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to update product",
-      });
+      notifyError("Failed to update product");
     } finally {
       setEditLoading(false);
     }
@@ -177,19 +158,12 @@ function Products() {
     try {
       setRemovingSpotlight(true);
       await apiClient.removeProductSpotlight(spotlightProduct.id);
-      toast({
-        title: "Success",
-        description: "Spotlight removed successfully",
-      });
+      notifySuccess("Spotlight removed successfully");
       setExistingSpotlight(null);
       setSpotlightProduct(null);
       fetchProducts();
     } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.response?.data?.detail || error.message || "Failed to remove spotlight",
-      });
+      notifyError(error.response?.data?.detail || error.message || "Failed to remove spotlight");
     } finally {
       setRemovingSpotlight(false);
     }
@@ -209,11 +183,7 @@ function Products() {
           // Use custom_end_time when custom date is selected
           requestData.custom_end_time = selectedDate.toISOString();
         } else {
-          toast({
-            variant: "destructive",
-            title: "Error",
-            description: "Custom date must be in the future",
-          });
+          notifyError("Custom date must be in the future");
           return;
         }
       } else {
@@ -222,21 +192,14 @@ function Products() {
       }
 
       await apiClient.addProductToSpotlight(spotlightProduct.id, requestData);
-      toast({
-        title: "Success",
-        description: "Product added to spotlight successfully",
-      });
+      notifySuccess("Product added to spotlight successfully");
       setExistingSpotlight(null);
       setSpotlightProduct(null);
       setSpotlightDuration("24");
       setCustomDate(null);
       fetchProducts();
     } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.response?.data?.detail || error.message || "Failed to add product to spotlight",
-      });
+      notifyError(error.response?.data?.detail || error.message || "Failed to add product to spotlight");
     } finally {
       setSpotlightLoading(false);
     }
@@ -825,7 +788,6 @@ const formatPrice = (value) => {
                     <Button
                       onClick={handleApplySpotlight}
                       disabled={spotlightLoading || (spotlightDuration === "custom" && !customDate)}
-                      className="bg-secondary text-white hover:bg-secondary/90"
                     >
                       {spotlightLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                       Apply Spotlight

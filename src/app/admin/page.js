@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DollarSign, ShoppingBag, Users2, Package2, TrendingUp, Star, AlertCircle, Flag } from "lucide-react";
 import { useEffect, useState } from "react";
 import { apiClient } from "@/lib/api-client";
-import { useToast } from "@/hooks/use-toast";
+import { notifyError } from "@/lib/toast";
 import {
   Table,
   TableBody,
@@ -37,7 +37,6 @@ const topProducts = [
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
-  const { toast } = useToast();
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -45,18 +44,14 @@ export default function Dashboard() {
         const data = await apiClient.getAdminStatsOverview();
         setStats(data);
       } catch (error) {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Failed to load dashboard statistics",
-        });
+        notifyError("Failed to load dashboard statistics");
       } finally {
         setLoading(false);
       }
     };
 
     fetchStats();
-  }, [toast]);
+  }, []);
 
   const formatChange = (change) => {
     const sign = change >= 0 ? "+" : "";
