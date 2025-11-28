@@ -315,6 +315,11 @@ class ApiClient {
     return response.data;
   }
 
+  async createAdminUser(data) {
+    const response = await this.client.post("/admin/users/create", data);
+    return response.data;
+  }
+
   async deleteAdminUser(userId) {
     const response = await this.client.delete(`/admin/users/${userId}`);
     return response.data;

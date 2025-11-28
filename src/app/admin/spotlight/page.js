@@ -253,7 +253,7 @@ function Spotlight() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/50 hover:bg-muted/50">
-                    <TableHead className="h-12 px-4 font-semibold text-secondary">Product</TableHead>
+                    <TableHead className="h-12 px-4 font-semibold text-secondary max-w-[300px]">Product</TableHead>
                     <TableHead className="h-12 px-4 font-semibold text-secondary">Seller</TableHead>
                     <TableHead className="h-12 px-4 font-semibold text-secondary">Applied At</TableHead>
                     <TableHead className="h-12 px-4 font-semibold text-secondary">End Time</TableHead>
@@ -266,8 +266,8 @@ function Spotlight() {
                   {history.map((item) => {
                     return (
                       <TableRow key={item.id || item.spotlight_id} className="hover:bg-muted/30 transition-colors">
-                        <TableCell className="py-3 px-4">
-                          <div className="flex items-center gap-3">
+                        <TableCell className="py-3 px-4 max-w-[300px]">
+                          <div className="flex items-start gap-3">
                             <div className="h-12 w-12 rounded-lg border border-border overflow-hidden bg-muted/50 shadow-sm flex-shrink-0">
                               {item.product_image ? (
                                 <img
@@ -281,11 +281,10 @@ function Spotlight() {
                                 </div>
                               )}
                             </div>
-                            <div className="min-w-0">
-                              <p className="font-semibold text-sm text-primary leading-tight truncate">
+                            <div className="min-w-0 flex-1">
+                              <p className="font-semibold text-sm text-primary leading-tight break-words">
                                 {item.product_title || "Untitled listing"}
                               </p>
-                              <p className="text-xs text-muted-foreground">ID: {item.product_id || "—"}</p>
                             </div>
                           </div>
                         </TableCell>

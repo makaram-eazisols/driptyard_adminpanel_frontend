@@ -303,14 +303,14 @@ const formatPrice = (value) => {
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-muted/50 hover:bg-muted/50">
-                        <TableHead className="h-12 px-4 font-semibold text-secondary">Thumbnail</TableHead>
-                        <TableHead className="h-12 px-4 font-semibold text-secondary">Title</TableHead>
-                        <TableHead className="h-12 px-4 font-semibold text-secondary">Seller</TableHead>
-                        <TableHead className="h-12 px-4 font-semibold text-secondary">Price</TableHead>
-                        <TableHead className="h-12 px-4 font-semibold text-secondary">Status</TableHead>
-                        <TableHead className="h-12 px-4 font-semibold text-secondary">Verification</TableHead>
+                        <TableHead className="h-12 px-4 font-semibold text-secondary max-w-[100px]">Thumbnail</TableHead>
+                        <TableHead className="h-12 px-4 font-semibold text-secondary max-w-[250px]">Title</TableHead>
+                        <TableHead className="h-12 px-4 font-semibold text-secondary max-w-[150px]">Seller</TableHead>
+                        <TableHead className="h-12 px-4 font-semibold text-secondary max-w-[100px]">Price</TableHead>
+                        <TableHead className="h-12 px-4 font-semibold text-secondary max-w-[120px]">Status</TableHead>
+                        <TableHead className="h-12 px-4 font-semibold text-secondary max-w-[120px]">Verification</TableHead>
                         {(canManageListings || canSpotlight) && (
-                          <TableHead className="h-12 px-4 text-right font-semibold text-secondary">Actions</TableHead>
+                          <TableHead className="h-12 px-4 text-right font-semibold text-secondary max-w-[100px]">Actions</TableHead>
                         )}
                       </TableRow>
                     </TableHeader>
@@ -321,7 +321,7 @@ const formatPrice = (value) => {
 
                         return (
                           <TableRow key={product.id} className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="py-3 px-4">
+                            <TableCell className="py-3 px-4 max-w-[100px]">
                               <div className="h-16 w-16 rounded-lg border border-border overflow-hidden bg-muted/50 shadow-sm">
                                 {image ? (
                                   <img
@@ -336,23 +336,23 @@ const formatPrice = (value) => {
                                 )}
                               </div>
                             </TableCell>
-                            <TableCell className="py-3 px-4">
-                              <p className="font-semibold text-sm text-primary leading-tight">{product.title || "Untitled listing"}</p>
+                            <TableCell className="py-3 px-4 max-w-[250px]">
+                              <p className="font-semibold text-sm text-primary leading-tight break-words">{product.title || "Untitled listing"}</p>
                             </TableCell>
-                            <TableCell className="py-3 px-4">
-                              <p className="text-sm text-foreground">{product?.owner_name}</p>
+                            <TableCell className="py-3 px-4 max-w-[150px]">
+                              <p className="text-sm text-foreground truncate">{product?.owner_name}</p>
                             </TableCell>
-                            <TableCell className="py-3 px-4">
+                            <TableCell className="py-3 px-4 max-w-[100px]">
                               <p className="font-semibold text-sm text-primary">{formatPrice(product.price)}</p>
                             </TableCell>
-                            <TableCell className="py-3 px-4">
+                            <TableCell className="py-3 px-4 max-w-[120px]">
                               <Badge variant={getStatusBadgeVariant(product)} className="text-xs">{getStatusText(product)}</Badge>
                             </TableCell>
-                            <TableCell className="py-3 px-4">
+                            <TableCell className="py-3 px-4 max-w-[120px]">
                               <Badge variant={authBadge.variant} className="text-xs">{authBadge.label}</Badge>
                             </TableCell>
                             {(canManageListings || canSpotlight) && (
-                              <TableCell className="py-3 px-4 text-right">
+                              <TableCell className="py-3 px-4 text-right max-w-[100px]">
                                 {(canManageListings || (product.is_verified && canSpotlight)) && (
                                   <DropdownMenu>
                                     <DropdownMenuTrigger asChild>

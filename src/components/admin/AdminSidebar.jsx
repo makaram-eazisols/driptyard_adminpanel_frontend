@@ -46,7 +46,7 @@ const buildMenuItems = (user) => {
   }
 
   if (can("can_see_users")) {
-    items.push({ title: "Users", url: "/admin/users", icon: Users2 });
+    items.push({ title: "Customers", url: "/admin/users", icon: Users2 });
   }
 
   if (can("can_see_listings")) {
@@ -67,7 +67,7 @@ const buildMenuItems = (user) => {
 
   // Only admins see Roles & Permissions management
   if (isAdmin || user?.role === "admin") {
-    items.push({ title: "Roles & Permissions", url: "/admin/roles-permissions", icon: Shield });
+    items.push({ title: "Users", url: "/admin/roles-permissions", icon: Shield });
   }
 
   return items;
