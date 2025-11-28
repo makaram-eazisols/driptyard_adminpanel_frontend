@@ -4,7 +4,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { DollarSign, ShoppingBag, Users2, Package2 } from "lucide-react";
+import { DollarSign, Users2, Package2 } from "lucide-react";
 
 function Analytics() {
   return (
