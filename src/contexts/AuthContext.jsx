@@ -2,6 +2,7 @@
 
 import { createContext, useState, useEffect } from "react";
 import { apiClient } from "@/lib/api-client";
+import { notifySuccess } from "@/lib/toast";
 
 export const AuthContext = createContext(undefined);
 
@@ -28,6 +29,15 @@ export const AuthProvider = ({ children }) => {
       if (token) {
         try {
           const userData = await apiClient.getCurrentUser();
+          // Try to hydrate permissions from localStorage (if backend doesn't return them)
+          let storedPermissions = null;
+          try {
+            const raw = localStorage.getItem("moderator_permissions");
+            if (raw) storedPermissions = JSON.parse(raw);
+          } catch {
+            storedPermissions = null;
+          }
+
           // Map backend user data to frontend User type
           const mappedUser = {
             id: userData.user_id,
@@ -38,8 +48,10 @@ export const AuthProvider = ({ children }) => {
               ? `${userData.first_name} ${userData.last_name}` 
               : userData.username || userData.email,
             email: userData.email,
-            role: userData.role || "customer",
+            role: userData.role || (userData.is_admin ? "admin" : userData.is_moderator ? "moderator" : "customer"),
             is_admin: userData.is_admin,
+            is_moderator: userData.is_moderator,
+            permissions: userData.permissions || storedPermissions || null,
             avatar: userData.avatar_url,
             phone: userData.phone,
             bio: userData.bio,
@@ -87,6 +99,12 @@ export const AuthProvider = ({ children }) => {
       if (response.refresh_token) {
         localStorage.setItem("refresh_token", response.refresh_token);
       }
+      // Store permissions for moderators/admins
+      if (response.permissions) {
+        localStorage.setItem("moderator_permissions", JSON.stringify(response.permissions));
+      } else {
+        localStorage.removeItem("moderator_permissions");
+      }
       
       // Map backend user data to frontend User type
       const mappedUser = {
@@ -98,17 +116,19 @@ export const AuthProvider = ({ children }) => {
           ? `${response.user.first_name} ${response.user.last_name}` 
           : response.user.username || response.user.email,
         email: response.user.email,
-        role: response.user.role || "customer",
+        role: response.user.role || (response.user.is_admin ? "admin" : response.user.is_moderator ? "moderator" : "customer"),
         is_admin: response.user.is_admin,
+        is_moderator: response.user.is_moderator,
+        permissions: response.permissions || null,
         avatar: response.user.avatar_url,
         phone: response.user.phone,
         bio: response.user.bio,
         verified: response.user.verified,
       };
       
-      // Check if user is admin
-      if (!mappedUser.is_admin) {
-        throw new Error("Access denied. Admin privileges required.");
+      // Check if user has admin or moderator access
+      if (!mappedUser.is_admin && !mappedUser.is_moderator) {
+        throw new Error("Access denied. Admin or moderator privileges required.");
       }
       
       setUser(mappedUser);
@@ -147,9 +167,13 @@ export const AuthProvider = ({ children }) => {
       setUser(null);
       localStorage.removeItem("access_token");
       localStorage.removeItem("refresh_token");
-      // Redirect to login page
+      localStorage.removeItem("moderator_permissions");
+      // Redirect to login page after showing toast
       if (typeof window !== "undefined") {
-        window.location.href = "/admin/login";
+        notifySuccess("You have been logged out.");
+        setTimeout(() => {
+          window.location.href = "/admin/login";
+        }, 300);
       }
     }
   };

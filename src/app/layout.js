@@ -33,7 +33,14 @@ export default function RootLayout({ children }) {
       >
         <Providers>
           {children}
-          <ToastContainer position="bottom-right" newestOnTop />
+          <ToastContainer
+            position="bottom-right"
+            newestOnTop
+            closeOnClick
+            draggable
+            pauseOnHover
+            autoClose={8000}
+          />
         </Providers>
       </body>
     </html>

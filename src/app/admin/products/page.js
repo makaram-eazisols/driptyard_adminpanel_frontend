@@ -9,6 +9,7 @@ import { Search, MoreVertical, Edit2, Trash2, Loader2, ChevronLeft, ChevronRight
 import { format } from "date-fns";
 import { apiClient } from "@/lib/api-client";
 import { notifyError, notifySuccess } from "@/lib/toast";
+import { useAuth } from "@/hooks/use-auth";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   AlertDialog,
@@ -44,6 +45,7 @@ const CONDITIONS = [
 ];
 
 function Products() {
+  const { user } = useAuth();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -61,6 +63,13 @@ function Products() {
   const [existingSpotlight, setExistingSpotlight] = useState(null);
   const [fetchingSpotlight, setFetchingSpotlight] = useState(false);
   const [removingSpotlight, setRemovingSpotlight] = useState(false);
+
+  // Check spotlight permissions
+  const canSpotlight = user?.is_admin || user?.permissions?.can_spotlight === true;
+  const canRemoveSpotlight = user?.is_admin || user?.permissions?.can_remove_spotlight === true;
+  
+  // Check manage listings permission
+  const canManageListings = user?.is_admin || user?.permissions?.can_manage_listings === true;
 
   const fetchProducts = async () => {
     try {
@@ -206,23 +215,12 @@ function Products() {
   };
 
   const getStatusBadgeVariant = (product) => {
-  const isHealthy =
-    product.is_active &&
-    !product.is_flagged &&
-    product.is_verified &&
-    !product.is_sold;
+    return product.is_active ? "success" : "destructive";
+  };
 
-  return isHealthy ? "success" : "destructive";
-};
-
-const getStatusText = (product) => {
-  if (!product.is_active) return "Inactive";
-  if (product.is_sold) return "Sold";
-  if (product.is_flagged) return "Flagged";
-  if (!product.is_verified) return "Unverified";
-  if (product.is_spotlighted) return "Featured";
-  return "Active";
-};
+  const getStatusText = (product) => {
+    return product.is_active ? "Active" : "Inactive";
+  };
 
 const getPrimaryImage = (product) => {
   if (Array.isArray(product.images) && product.images.length > 0) {
@@ -253,15 +251,12 @@ const getSellerName = (product) => {
   return "Unknown seller";
 };
 
-const getAuthBadge = (product) => {
-  if (product.is_verified) {
-    return { label: "Verified", variant: "success" };
-  }
-  if (product.is_flagged) {
-    return { label: "Flagged", variant: "destructive" };
-  }
-  return { label: "Pending Review", variant: "outline" };
-};
+  const getAuthBadge = (product) => {
+    if (product.is_verified) {
+      return { label: "Verified", variant: "success" };
+    }
+    return { label: "Unverified", variant: "destructive" };
+  };
 
 const formatPrice = (value) => {
   const numeric = Number(value);
@@ -314,7 +309,9 @@ const formatPrice = (value) => {
                         <TableHead className="h-12 px-4 font-semibold text-secondary">Price</TableHead>
                         <TableHead className="h-12 px-4 font-semibold text-secondary">Status</TableHead>
                         <TableHead className="h-12 px-4 font-semibold text-secondary">Verification</TableHead>
-                        <TableHead className="h-12 px-4 text-right font-semibold text-secondary">Actions</TableHead>
+                        {(canManageListings || canSpotlight) && (
+                          <TableHead className="h-12 px-4 text-right font-semibold text-secondary">Actions</TableHead>
+                        )}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -354,37 +351,45 @@ const formatPrice = (value) => {
                             <TableCell className="py-3 px-4">
                               <Badge variant={authBadge.variant} className="text-xs">{authBadge.label}</Badge>
                             </TableCell>
-                            <TableCell className="py-3 px-4 text-right">
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                                    <MoreVertical className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  {product.is_verified && (
-                                    <DropdownMenuItem
-                                      className="cursor-pointer group flex items-center gap-2 hover:bg-[#E0B74F] hover:text-[#0B0B0D] focus:bg-[#E0B74F] focus:text-[#0B0B0D] transition-colors"
-                                      onClick={() => setSpotlightProduct(product)}
-                                    >
-                                      <Star className="h-4 w-4 text-accent transition-colors group-hover:text-[#0B0B0D] group-focus:text-[#0B0B0D]" />
-                                      Spotlight
-                                    </DropdownMenuItem>
-                                  )}
-                                  <DropdownMenuItem className="cursor-pointer" onClick={() => setEditProduct(product)}>
-                                    <Edit2 className="h-4 w-4 mr-2" />
-                                    Edit
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    className="text-destructive cursor-pointer focus:text-destructive"
-                                    onClick={() => setDeleteProductId(product.id)}
-                                  >
-                                    <Trash2 className="h-4 w-4 mr-2" />
-                                    Delete
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </TableCell>
+                            {(canManageListings || canSpotlight) && (
+                              <TableCell className="py-3 px-4 text-right">
+                                {(canManageListings || (product.is_verified && canSpotlight)) && (
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                                        <MoreVertical className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      {product.is_verified && canSpotlight && (
+                                        <DropdownMenuItem
+                                          className="cursor-pointer group flex items-center gap-2 hover:bg-[#E0B74F] hover:text-[#0B0B0D] focus:bg-[#E0B74F] focus:text-[#0B0B0D] transition-colors"
+                                          onClick={() => setSpotlightProduct(product)}
+                                        >
+                                          <Star className="h-4 w-4 text-accent transition-colors group-hover:text-[#0B0B0D] group-focus:text-[#0B0B0D]" />
+                                          Spotlight
+                                        </DropdownMenuItem>
+                                      )}
+                                      {canManageListings && (
+                                        <>
+                                          <DropdownMenuItem className="cursor-pointer" onClick={() => setEditProduct(product)}>
+                                            <Edit2 className="h-4 w-4 mr-2" />
+                                            Edit
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem
+                                            className="text-destructive cursor-pointer focus:text-destructive"
+                                            onClick={() => setDeleteProductId(product.id)}
+                                          >
+                                            <Trash2 className="h-4 w-4 mr-2" />
+                                            Delete
+                                          </DropdownMenuItem>
+                                        </>
+                                      )}
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                )}
+                              </TableCell>
+                            )}
                           </TableRow>
                         );
                       })}
@@ -428,7 +433,8 @@ const formatPrice = (value) => {
       {/* </div> */}
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={!!deleteProductId} onOpenChange={() => setDeleteProductId(null)}>
+      {canManageListings && (
+        <AlertDialog open={!!deleteProductId} onOpenChange={() => setDeleteProductId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
@@ -444,9 +450,11 @@ const formatPrice = (value) => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      )}
 
       {/* Edit Product Dialog */}
-      <Dialog open={!!editProduct} onOpenChange={() => setEditProduct(null)}>
+      {canManageListings && (
+        <Dialog open={!!editProduct} onOpenChange={() => setEditProduct(null)}>
         <DialogContent className="max-w-md" onOpenAutoFocus={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>Edit Product Status</DialogTitle>
@@ -538,6 +546,7 @@ const formatPrice = (value) => {
           )}
         </DialogContent>
       </Dialog>
+      )}
 
       {/* Spotlight Modal */}
       <Dialog open={!!spotlightProduct} onOpenChange={() => {
@@ -622,16 +631,18 @@ const formatPrice = (value) => {
                     >
                       Close
                     </Button>
-                    <Button
-                      onClick={handleRemoveSpotlight}
-                      disabled={removingSpotlight}
-                      variant="destructive"
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    >
-                      {removingSpotlight && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                      <X className="h-4 w-4 mr-2" />
-                      Remove Spotlight
-                    </Button>
+                    {canRemoveSpotlight && (
+                      <Button
+                        onClick={handleRemoveSpotlight}
+                        disabled={removingSpotlight}
+                        variant="destructive"
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        {removingSpotlight && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                        <X className="h-4 w-4 mr-2" />
+                        Remove Spotlight
+                      </Button>
+                    )}
                   </div>
                 </div>
               ) : (
@@ -785,13 +796,15 @@ const formatPrice = (value) => {
                     >
                       Cancel
                     </Button>
-                    <Button
-                      onClick={handleApplySpotlight}
-                      disabled={spotlightLoading || (spotlightDuration === "custom" && !customDate)}
-                    >
-                      {spotlightLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                      Apply Spotlight
-                    </Button>
+                    {canSpotlight && (
+                      <Button
+                        onClick={handleApplySpotlight}
+                        disabled={spotlightLoading || (spotlightDuration === "custom" && !customDate)}
+                      >
+                        {spotlightLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                        Apply Spotlight
+                      </Button>
+                    )}
                   </div>
                 </>
               )}

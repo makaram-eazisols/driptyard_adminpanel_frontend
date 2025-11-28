@@ -10,6 +10,7 @@ import {
   Flag,
   Star,
   ChevronRight,
+  Shield,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { cn } from "@/lib/utils";
@@ -27,23 +28,55 @@ import {
   SidebarMenuSubButton,
   SidebarHeader,
 } from "@/components/ui/sidebar";
+import { useAuth } from "@/hooks/use-auth";
 
-const menuItems = [
-  { title: "Dashboard", url: "/admin", icon: Home, end: true },
-  { title: "Users", url: "/admin/users", icon: Users2 },
-  {
-    title: "Listings",
-    icon: Package2,
-    children: [
-      { title: "Listings", url: "/admin/products", icon: Package2 },
-      { title: "Spotlight History", url: "/admin/spotlight", icon: Star },
-    ],
-  },
-  { title: "Flagged Content", url: "/admin/flagged", icon: Flag },
-];
+const buildMenuItems = (user) => {
+  const isAdmin = user?.is_admin;
+  const perms = user?.permissions || {};
+
+  const can = (field) => {
+    if (isAdmin) return true;
+    return !!perms[field];
+  };
+
+  const items = [];
+
+  if (can("can_see_dashboard")) {
+    items.push({ title: "Dashboard", url: "/admin", icon: Home, end: true });
+  }
+
+  if (can("can_see_users")) {
+    items.push({ title: "Users", url: "/admin/users", icon: Users2 });
+  }
+
+  if (can("can_see_listings")) {
+    const listingsChildren = [{ title: "Listings", url: "/admin/products", icon: Package2 }];
+    if (can("can_see_spotlight_history")) {
+      listingsChildren.push({ title: "Spotlight History", url: "/admin/spotlight", icon: Star });
+    }
+    items.push({
+      title: "Listings",
+      icon: Package2,
+      children: listingsChildren,
+    });
+  }
+
+  if (can("can_see_flagged_content")) {
+    items.push({ title: "Flagged Content", url: "/admin/flagged", icon: Flag });
+  }
+
+  // Only admins see Roles & Permissions management
+  if (isAdmin || user?.role === "admin") {
+    items.push({ title: "Roles & Permissions", url: "/admin/roles-permissions", icon: Shield });
+  }
+
+  return items;
+};
 
 export function AdminSidebar() {
   const pathname = usePathname();
+  const { user } = useAuth();
+  const menuItems = buildMenuItems(user);
   const [openMenu, setOpenMenu] = useState(() => {
     const parent = menuItems.find((item) => item.children?.some((child) => pathname?.startsWith(child.url)));
     return parent ? parent.title : null;
@@ -54,7 +87,7 @@ export function AdminSidebar() {
     if (parent) {
       setOpenMenu(parent.title);
     }
-  }, [pathname]);
+  }, [pathname, menuItems]);
 
   return (
     <Sidebar className="border-r border-border bg-card" collapsible="offcanvas">
@@ -110,7 +143,8 @@ export function AdminSidebar() {
                                     className={cn(
                                       "flex items-center gap-2 rounded-md px-3 py-1.5 text-foreground/70",
                                       !isChildActive && "hover:bg-muted",
-                                      isChildActive && "bg-primary text-primary-foreground font-medium shadow-sm",
+                                      isChildActive &&
+                                        "bg-primary text-primary-foreground font-medium shadow-sm",
                                     )}
                                   >
                                     <child.icon className="h-4 w-4" strokeWidth={2} />
@@ -126,11 +160,12 @@ export function AdminSidebar() {
                   );
                 }
 
-                const isActive = pathname === item.url || (item.url !== "/admin" && pathname?.startsWith(item.url));
+                const isActive =
+                  pathname === item.url || (item.url !== "/admin" && pathname?.startsWith(item.url));
 
                 return (
                   <SidebarMenuItem key={item.title}>
-                <SidebarMenuButton asChild isActive={isActive}>
+                    <SidebarMenuButton asChild isActive={isActive}>
                       <NavLink
                         href={item.url}
                         className={cn(

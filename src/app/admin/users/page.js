@@ -31,8 +31,10 @@ import { Switch } from "@/components/ui/switch";
 import { apiClient } from "@/lib/api-client";
 import { notifyError, notifySuccess } from "@/lib/toast";
 import { format } from "date-fns";
+import { useAuth } from "@/hooks/use-auth";
 
 function Users() {
+  const { user } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -44,6 +46,9 @@ function Users() {
   const [deleteUserId, setDeleteUserId] = useState(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editLoading, setEditLoading] = useState(false);
+
+  // Check manage users permission
+  const canManageUsers = user?.is_admin || user?.permissions?.can_manage_users === true;
 
   useEffect(() => {
     fetchUsers();
@@ -167,7 +172,9 @@ function Users() {
                       <TableHead className="h-12 px-4 font-semibold text-secondary">Email</TableHead>
                       <TableHead className="h-12 px-4 font-semibold text-secondary">Status</TableHead>
                       <TableHead className="h-12 px-4 font-semibold text-secondary">Joined</TableHead>
-                      <TableHead className="h-12 px-4 text-right font-semibold text-secondary">Actions</TableHead>
+                      {canManageUsers && (
+                        <TableHead className="h-12 px-4 text-right font-semibold text-secondary">Actions</TableHead>
+                      )}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -185,28 +192,30 @@ function Users() {
                         <TableCell className="py-3 px-4">
                           <p className="text-sm text-foreground">{format(new Date(user.created_at), "MMM dd, yyyy")}</p>
                         </TableCell>
-                        <TableCell className="py-3 px-4 text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8">
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem className="cursor-pointer" onClick={() => handleEditUser(user)}>
-                                <Edit2 className="h-4 w-4 mr-2" />
-                                Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                className="text-destructive cursor-pointer focus:text-destructive"
-                                onClick={() => setDeleteUserId(user.id)}
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
+                        {canManageUsers && (
+                          <TableCell className="py-3 px-4 text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem className="cursor-pointer" onClick={() => handleEditUser(user)}>
+                                  <Edit2 className="h-4 w-4 mr-2" />
+                                  Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="text-destructive cursor-pointer focus:text-destructive"
+                                  onClick={() => setDeleteUserId(user.id)}
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        )}
                       </TableRow>
                     ))}
                   </TableBody>
@@ -248,7 +257,8 @@ function Users() {
       </div>
 
       {/* Edit User Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+      {canManageUsers && (
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent onOpenAutoFocus={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>Edit User</DialogTitle>
@@ -323,9 +333,11 @@ function Users() {
           )}
         </DialogContent>
       </Dialog>
+      )}
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={!!deleteUserId} onOpenChange={() => setDeleteUserId(null)}>
+      {canManageUsers && (
+        <AlertDialog open={!!deleteUserId} onOpenChange={() => setDeleteUserId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
@@ -344,6 +356,7 @@ function Users() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      )}
     </AdminLayout>
   );
 }

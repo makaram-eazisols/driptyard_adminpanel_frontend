@@ -11,8 +11,10 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Flag, Search, CheckCircle, XCircle, Loader2, RotateCcw, Check } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import { notifyError, notifySuccess } from "@/lib/toast";
+import { useAuth } from "@/hooks/use-auth";
 
 function FlaggedContent() {
+  const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [flaggedContent, setFlaggedContent] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -20,6 +22,10 @@ function FlaggedContent() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const pageSize = 10;
+
+  // Check if user can manage flagged content
+  const canManageFlaggedContent =
+    user?.is_admin || user?.permissions?.can_manage_flagged_content === true;
 
   const STATUS_SUCCESS_STATES = ["resolved", "approved", "cleared"];
 
@@ -215,53 +221,55 @@ function FlaggedContent() {
                         </div>
                       </div>
 
-                      <div className="flex gap-2 pt-2">
-                        {isPending(item.status) ? (
-                          <>
+                      {canManageFlaggedContent && (
+                        <div className="flex gap-2 pt-2">
+                          {isPending(item.status) ? (
+                            <>
+                              <Button
+                                size="sm"
+                                className="gradient-driptyard-hover text-white flex-1"
+                                onClick={() => handleApprove(item)}
+                                disabled={loadingActions[`approve-${item.reportId}`]}
+                              >
+                                {loadingActions[`approve-${item.reportId}`] ? (
+                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                ) : (
+                                  <CheckCircle className="h-4 w-4 mr-2" />
+                                )}
+                                Approve
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                className="flex-1"
+                                onClick={() => handleRemove(item)}
+                                disabled={loadingActions[`remove-${item.reportId}`]}
+                              >
+                                {loadingActions[`remove-${item.reportId}`] ? (
+                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                ) : (
+                                  <XCircle className="h-4 w-4 mr-2" />
+                                )}
+                                Remove
+                              </Button>
+                            </>
+                          ) : (
                             <Button
                               size="sm"
-                              className="gradient-driptyard-hover text-white flex-1"
-                              onClick={() => handleApprove(item)}
-                              disabled={loadingActions[`approve-${item.reportId}`]}
+                              className="gradient-driptyard-hover text-white w-full"
+                              onClick={() => handleReReview(item)}
+                              disabled={loadingActions[`review-${item.reportId}`]}
                             >
-                              {loadingActions[`approve-${item.reportId}`] ? (
+                              {loadingActions[`review-${item.reportId}`] ? (
                                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                               ) : (
-                                <CheckCircle className="h-4 w-4 mr-2" />
+                                <Check className="h-4 w-4 mr-2" />
                               )}
-                              Approve
+                              Review Again
                             </Button>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              className="flex-1"
-                              onClick={() => handleRemove(item)}
-                              disabled={loadingActions[`remove-${item.reportId}`]}
-                            >
-                              {loadingActions[`remove-${item.reportId}`] ? (
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              ) : (
-                                <XCircle className="h-4 w-4 mr-2" />
-                              )}
-                              Remove
-                            </Button>
-                          </>
-                        ) : (
-                          <Button
-                            size="sm"
-                            className="gradient-driptyard-hover text-white w-full"
-                            onClick={() => handleReReview(item)}
-                            disabled={loadingActions[`review-${item.reportId}`]}
-                          >
-                            {loadingActions[`review-${item.reportId}`] ? (
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            ) : (
-                              <Check className="h-4 w-4 mr-2" />
-                            )}
-                            Review Again
-                          </Button>
-                        )}
-                      </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>

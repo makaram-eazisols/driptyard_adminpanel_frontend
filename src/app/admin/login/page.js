@@ -85,7 +85,7 @@ export default function Login() {
             DRIPTYARD Admin
           </CardTitle>
           <CardDescription>
-            Sign in to access the admin dashboard
+            Sign in to access the admin dashboard (Admin & Moderator access)
           </CardDescription>
         </CardHeader>
         <CardContent>

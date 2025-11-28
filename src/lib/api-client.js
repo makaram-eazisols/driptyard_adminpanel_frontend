@@ -340,6 +340,23 @@ class ApiClient {
     const response = await this.client.post(`/admin/reports/${reportId}/review`);
     return response.data;
   }
+
+  // ============ MODERATORS ENDPOINTS ============
+  async getModerators(params) {
+    const response = await this.client.get("/moderators", { params });
+    // Backend returns: { moderators, total, page, page_size, total_pages }
+    return response.data;
+  }
+
+  async getModeratorPermissions(moderatorId) {
+    const response = await this.client.get(`/moderators/${moderatorId}/permissions`);
+    return response.data;
+  }
+
+  async updateModeratorPermissions(moderatorId, data) {
+    const response = await this.client.put(`/moderators/${moderatorId}/permissions`, data);
+    return response.data;
+  }
 }
 
 export const apiClient = new ApiClient();

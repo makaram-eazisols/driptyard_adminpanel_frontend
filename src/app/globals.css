@@ -205,3 +205,53 @@ All colors MUST be HSL.
 .read-the-docs {
   color: hsl(var(--muted-foreground));
 }
+
+@layer components {
+  .toast-card {
+    @apply relative flex items-start gap-3 rounded-2xl border border-black/5 bg-white px-4 py-3 shadow-lg;
+    min-width: 328px;
+  }
+
+  .toast-card__indicator {
+    @apply absolute left-0 top-0 h-full w-1.5 rounded-l-2xl;
+  }
+
+  .toast-card__title {
+    @apply text-sm font-semibold text-[#0B0B0D];
+    font-family: var(--font-playfair), "Playfair Display", serif;
+  }
+
+  .toast-card__description {
+    @apply text-xs text-[#333333];
+  }
+}
+
+.Toastify__toast {
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  min-height: auto !important;
+  position: relative;
+}
+
+.Toastify__toast-body {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.Toastify__close-button {
+  position: absolute !important;
+  top: 10px;
+  right: 10px;
+  color: #333333 !important;
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
+}
+
+.Toastify__close-button:hover {
+  opacity: 1;
+}
+
+.Toastify__progress-bar {
+  display: none !important;
+}
