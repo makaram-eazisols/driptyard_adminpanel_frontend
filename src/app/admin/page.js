@@ -9,56 +9,54 @@ import { apiClient } from "@/lib/api-client";
 import { notifyError } from "@/lib/toast";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
-// Sample data for Total Products chart (last 30 days)
-const productsData = [
-  { date: "Nov 1", count: 120 },
-  { date: "Nov 3", count: 135 },
-  { date: "Nov 5", count: 145 },
-  { date: "Nov 7", count: 160 },
-  { date: "Nov 9", count: 175 },
-  { date: "Nov 11", count: 188 },
-  { date: "Nov 13", count: 195 },
-  { date: "Nov 15", count: 210 },
-  { date: "Nov 17", count: 225 },
-  { date: "Nov 19", count: 240 },
-  { date: "Nov 21", count: 258 },
-  { date: "Nov 23", count: 270 },
-  { date: "Nov 25", count: 285 },
-  { date: "Nov 27", count: 298 },
-  { date: "Nov 29", count: 315 },
-  { date: "Dec 1", count: 332 },
-];
-
-// Sample data for Total Users chart (last 30 days)
-const usersData = [
-  { date: "Nov 1", count: 450 },
-  { date: "Nov 3", count: 480 },
-  { date: "Nov 5", count: 510 },
-  { date: "Nov 7", count: 545 },
-  { date: "Nov 9", count: 575 },
-  { date: "Nov 11", count: 608 },
-  { date: "Nov 13", count: 640 },
-  { date: "Nov 15", count: 675 },
-  { date: "Nov 17", count: 710 },
-  { date: "Nov 19", count: 748 },
-  { date: "Nov 21", count: 785 },
-  { date: "Nov 23", count: 820 },
-  { date: "Nov 25", count: 858 },
-  { date: "Nov 27", count: 895 },
-  { date: "Nov 29", count: 932 },
-  { date: "Dec 1", count: 970 },
-];
+// Helper function to format date for display
+const formatDateForChart = (dateString) => {
+  const date = new Date(dateString);
+  const month = date.toLocaleDateString('en-US', { month: 'short' });
+  const day = date.getDate();
+  return `${month} ${day}`;
+};
 
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [productsChartData, setProductsChartData] = useState([]);
+  const [usersChartData, setUsersChartData] = useState([]);
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
         const data = await apiClient.getAdminStatsOverview();
+        console.log("📊 Dashboard API Response:", data);
         setStats(data);
+        
+        // Transform products growth data for chart
+        if (data?.products_growth_data && Array.isArray(data.products_growth_data)) {
+          const transformedProducts = data.products_growth_data.map(item => ({
+            date: formatDateForChart(item.date),
+            count: item.cumulative,
+            dailyCount: item.count
+          }));
+          console.log("📦 Products Chart Data:", transformedProducts);
+          setProductsChartData(transformedProducts);
+        } else {
+          console.warn("⚠️ No products_growth_data in API response");
+        }
+        
+        // Transform users growth data for chart
+        if (data?.users_growth_data && Array.isArray(data.users_growth_data)) {
+          const transformedUsers = data.users_growth_data.map(item => ({
+            date: formatDateForChart(item.date),
+            count: item.cumulative,
+            dailyCount: item.count
+          }));
+          console.log("👥 Users Chart Data:", transformedUsers);
+          setUsersChartData(transformedUsers);
+        } else {
+          console.warn("⚠️ No users_growth_data in API response");
+        }
       } catch (error) {
+        console.error("❌ Dashboard API Error:", error);
         notifyError("Failed to load dashboard statistics");
       } finally {
         setLoading(false);
@@ -131,45 +129,62 @@ export default function Dashboard() {
               <p className="text-sm text-[#333333] mt-1">Product listings over the last 30 days</p>
             </CardHeader>
             <CardContent className="p-4 pt-2">
-              <ResponsiveContainer width="100%" height={350}>
-                <BarChart data={productsData}>
-                  <defs>
-                    <linearGradient id="colorProducts" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#1F4E79" stopOpacity={0.9}/>
-                      <stop offset="95%" stopColor="#1F4E79" stopOpacity={0.6}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E5E5" />
-                  <XAxis 
-                    dataKey="date" 
-                    stroke="#333333"
-                    style={{ fontSize: '12px', fontFamily: 'Inter' }}
-                  />
-                  <YAxis 
-                    stroke="#333333"
-                    style={{ fontSize: '12px', fontFamily: 'Inter' }}
-                  />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: '#F8F8F8',
-                      border: '1px solid #E0B74F',
-                      borderRadius: '8px',
-                      fontFamily: 'Inter'
-                    }}
-                    labelStyle={{ color: '#0B0B0D', fontWeight: 'bold' }}
-                    cursor={{ fill: 'rgba(31, 78, 121, 0.1)' }}
-                  />
-                  <Bar 
-                    dataKey="count" 
-                    fill="url(#colorProducts)" 
-                    radius={[8, 8, 0, 0]}
-                    maxBarSize={60}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
+              {loading ? (
+                <div className="flex items-center justify-center h-[350px]">
+                  <div className="animate-pulse text-[#333333]">Loading chart data...</div>
+                </div>
+              ) : productsChartData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={350}>
+                  <BarChart data={productsChartData}>
+                    <defs>
+                      <linearGradient id="colorProducts" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#1F4E79" stopOpacity={0.9}/>
+                        <stop offset="95%" stopColor="#1F4E79" stopOpacity={0.6}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#E5E5E5" />
+                    <XAxis 
+                      dataKey="date" 
+                      stroke="#333333"
+                      style={{ fontSize: '11px', fontFamily: 'Inter' }}
+                      angle={-45}
+                      textAnchor="end"
+                      height={80}
+                    />
+                    <YAxis 
+                      stroke="#333333"
+                      style={{ fontSize: '12px', fontFamily: 'Inter' }}
+                    />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: '#F8F8F8',
+                        border: '1px solid #E0B74F',
+                        borderRadius: '8px',
+                        fontFamily: 'Inter'
+                      }}
+                      labelStyle={{ color: '#0B0B0D', fontWeight: 'bold' }}
+                      cursor={{ fill: 'rgba(31, 78, 121, 0.1)' }}
+                      formatter={(value, name) => {
+                        if (name === 'count') return [value, 'Total Products'];
+                        return [value, name];
+                      }}
+                    />
+                    <Bar 
+                      dataKey="count" 
+                      fill="url(#colorProducts)" 
+                      radius={[8, 8, 0, 0]}
+                      maxBarSize={60}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-[350px] text-muted-foreground">
+                  No data available
+                </div>
+              )}
               <div className="mt-4 flex items-center justify-between bg-[#F8F8F8] p-3 rounded-lg">
                 <span className="text-sm font-medium text-[#333333]">Current Total:</span>
-                <span className="text-2xl font-bold text-[#1F4E79]">{stats?.total_products || 332}</span>
+                <span className="text-2xl font-bold text-[#1F4E79]">{stats?.total_products || 0}</span>
               </div>
             </CardContent>
           </Card>
@@ -184,46 +199,63 @@ export default function Dashboard() {
               <p className="text-sm text-[#333333] mt-1">User registrations over the last 30 days</p>
             </CardHeader>
             <CardContent className="p-4 pt-2">
-              <ResponsiveContainer width="100%" height={350}>
-                <AreaChart data={usersData}>
-                  <defs>
-                    <linearGradient id="colorUsers" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#2ECC71" stopOpacity={0.8}/>
-                      <stop offset="95%" stopColor="#2ECC71" stopOpacity={0.1}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E5E5" />
-                  <XAxis 
-                    dataKey="date" 
-                    stroke="#333333"
-                    style={{ fontSize: '12px', fontFamily: 'Inter' }}
-                  />
-                  <YAxis 
-                    stroke="#333333"
-                    style={{ fontSize: '12px', fontFamily: 'Inter' }}
-                  />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: '#F8F8F8',
-                      border: '1px solid #E0B74F',
-                      borderRadius: '8px',
-                      fontFamily: 'Inter'
-                    }}
-                    labelStyle={{ color: '#0B0B0D', fontWeight: 'bold' }}
-                  />
-                  <Area 
-                    type="monotone" 
-                    dataKey="count" 
-                    stroke="#2ECC71" 
-                    strokeWidth={3}
-                    fillOpacity={1} 
-                    fill="url(#colorUsers)" 
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
+              {loading ? (
+                <div className="flex items-center justify-center h-[350px]">
+                  <div className="animate-pulse text-[#333333]">Loading chart data...</div>
+                </div>
+              ) : usersChartData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={350}>
+                  <AreaChart data={usersChartData}>
+                    <defs>
+                      <linearGradient id="colorUsers" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#2ECC71" stopOpacity={0.8}/>
+                        <stop offset="95%" stopColor="#2ECC71" stopOpacity={0.1}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#E5E5E5" />
+                    <XAxis 
+                      dataKey="date" 
+                      stroke="#333333"
+                      style={{ fontSize: '11px', fontFamily: 'Inter' }}
+                      angle={-45}
+                      textAnchor="end"
+                      height={80}
+                    />
+                    <YAxis 
+                      stroke="#333333"
+                      style={{ fontSize: '12px', fontFamily: 'Inter' }}
+                    />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: '#F8F8F8',
+                        border: '1px solid #E0B74F',
+                        borderRadius: '8px',
+                        fontFamily: 'Inter'
+                      }}
+                      labelStyle={{ color: '#0B0B0D', fontWeight: 'bold' }}
+                      formatter={(value, name) => {
+                        if (name === 'count') return [value, 'Total Users'];
+                        return [value, name];
+                      }}
+                    />
+                    <Area 
+                      type="monotone" 
+                      dataKey="count" 
+                      stroke="#2ECC71" 
+                      strokeWidth={3}
+                      fillOpacity={1} 
+                      fill="url(#colorUsers)" 
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-[350px] text-muted-foreground">
+                  No data available
+                </div>
+              )}
               <div className="mt-4 flex items-center justify-between bg-[#F8F8F8] p-3 rounded-lg">
                 <span className="text-sm font-medium text-[#333333]">Current Total:</span>
-                <span className="text-2xl font-bold text-[#2ECC71]">{stats?.total_users || 970}</span>
+                <span className="text-2xl font-bold text-[#2ECC71]">{stats?.total_users || 0}</span>
               </div>
             </CardContent>
           </Card>
