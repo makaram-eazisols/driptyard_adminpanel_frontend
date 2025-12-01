@@ -3,35 +3,50 @@
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { StatCard } from "@/components/admin/StatCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, ShoppingBag, Users2, Package2, TrendingUp, Star, AlertCircle, Flag } from "lucide-react";
+import { Users2, Package2, AlertCircle, Flag } from "lucide-react";
 import { useEffect, useState } from "react";
 import { apiClient } from "@/lib/api-client";
 import { notifyError } from "@/lib/toast";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
-const SUCCESS_ORDER_STATUSES = ["completed", "shipped", "delivered", "paid"];
-
-const recentOrders = [
-  { id: "ORD001", customer: "John Doe", product: "Luxury Watch", amount: "$1,299", status: "completed" },
-  { id: "ORD002", customer: "Jane Smith", product: "Designer Shirt", amount: "$89", status: "pending" },
-  { id: "ORD003", customer: "Mike Johnson", product: "Sneakers", amount: "$159", status: "processing" },
-  { id: "ORD004", customer: "Sarah Williams", product: "Handbag", amount: "$449", status: "completed" },
-  { id: "ORD005", customer: "Tom Brown", product: "Sunglasses", amount: "$199", status: "pending" },
+// Sample data for Total Products chart (last 30 days)
+const productsData = [
+  { date: "Nov 1", count: 120 },
+  { date: "Nov 3", count: 135 },
+  { date: "Nov 5", count: 145 },
+  { date: "Nov 7", count: 160 },
+  { date: "Nov 9", count: 175 },
+  { date: "Nov 11", count: 188 },
+  { date: "Nov 13", count: 195 },
+  { date: "Nov 15", count: 210 },
+  { date: "Nov 17", count: 225 },
+  { date: "Nov 19", count: 240 },
+  { date: "Nov 21", count: 258 },
+  { date: "Nov 23", count: 270 },
+  { date: "Nov 25", count: 285 },
+  { date: "Nov 27", count: 298 },
+  { date: "Nov 29", count: 315 },
+  { date: "Dec 1", count: 332 },
 ];
 
-const topProducts = [
-  { name: "Luxury Watch Collection", sales: 234, revenue: "$304,866" },
-  { name: "Designer Shoes", sales: 189, revenue: "$30,051" },
-  { name: "Premium Shirts", sales: 156, revenue: "$13,884" },
-  { name: "Fashion Accessories", sales: 142, revenue: "$28,400" },
+// Sample data for Total Users chart (last 30 days)
+const usersData = [
+  { date: "Nov 1", count: 450 },
+  { date: "Nov 3", count: 480 },
+  { date: "Nov 5", count: 510 },
+  { date: "Nov 7", count: 545 },
+  { date: "Nov 9", count: 575 },
+  { date: "Nov 11", count: 608 },
+  { date: "Nov 13", count: 640 },
+  { date: "Nov 15", count: 675 },
+  { date: "Nov 17", count: 710 },
+  { date: "Nov 19", count: 748 },
+  { date: "Nov 21", count: 785 },
+  { date: "Nov 23", count: 820 },
+  { date: "Nov 25", count: 858 },
+  { date: "Nov 27", count: 895 },
+  { date: "Nov 29", count: 932 },
+  { date: "Dec 1", count: 970 },
 ];
 
 export default function Dashboard() {
@@ -106,82 +121,109 @@ export default function Dashboard() {
           </div>
         {/* ) : null} */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader className="p-3 pb-0">
-              <CardTitle className="flex items-center gap-2 text-lg font-bold">
-                <ShoppingBag className="h-5 w-5" strokeWidth={2.5} />
-                Recent Orders
+          {/* Total Products Chart */}
+          <Card className="shadow-md">
+            <CardHeader className="p-4 pb-2">
+              <CardTitle className="flex items-center gap-2 text-xl font-bold font-playfair text-[#0B0B0D]">
+                <Package2 className="h-6 w-6 text-[#1F4E79]" strokeWidth={2.5} />
+                Total Products Growth
               </CardTitle>
+              <p className="text-sm text-[#333333] mt-1">Product listings over the last 30 days</p>
             </CardHeader>
-            <CardContent className="p-0">
-                <Table className="text-sm text-[hsl(var(--foreground))]">
-                <TableHeader>
-                    <TableRow className="text-xs font-semibold text-muted-foreground">
-                      <TableHead className="p-3 text-xs">Order ID</TableHead>
-                      <TableHead className="p-3 text-xs">Customer</TableHead>
-                      <TableHead className="p-3 text-xs">Product</TableHead>
-                      <TableHead className="p-3 text-xs">Amount</TableHead>
-                      <TableHead className="p-3 text-right text-xs">Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {recentOrders.map((order) => (
-                    <TableRow
-                      key={order.id}
-                      className="border-b border-border/80 bg-white last:border-0  hover:bg-muted/60 transition-colors"
-                    >
-                      <TableCell className="p-3 font-semibold text-[hsl(var(--primary))]">{order.id}</TableCell>
-                      <TableCell className="p-3">{order.customer}</TableCell>
-                      <TableCell className="p-3">{order.product}</TableCell>
-                      <TableCell className="p-3 font-medium text-right">{order.amount}</TableCell>
-                      <TableCell className="p-3 text-right">
-                        <Badge
-                          variant={
-                            SUCCESS_ORDER_STATUSES.includes((order.status || "").toLowerCase())
-                              ? "success"
-                              : "destructive"
-                          }
-                        >
-                          {order.status}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+            <CardContent className="p-4 pt-2">
+              <ResponsiveContainer width="100%" height={350}>
+                <BarChart data={productsData}>
+                  <defs>
+                    <linearGradient id="colorProducts" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#1F4E79" stopOpacity={0.9}/>
+                      <stop offset="95%" stopColor="#1F4E79" stopOpacity={0.6}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E5E5" />
+                  <XAxis 
+                    dataKey="date" 
+                    stroke="#333333"
+                    style={{ fontSize: '12px', fontFamily: 'Inter' }}
+                  />
+                  <YAxis 
+                    stroke="#333333"
+                    style={{ fontSize: '12px', fontFamily: 'Inter' }}
+                  />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#F8F8F8',
+                      border: '1px solid #E0B74F',
+                      borderRadius: '8px',
+                      fontFamily: 'Inter'
+                    }}
+                    labelStyle={{ color: '#0B0B0D', fontWeight: 'bold' }}
+                    cursor={{ fill: 'rgba(31, 78, 121, 0.1)' }}
+                  />
+                  <Bar 
+                    dataKey="count" 
+                    fill="url(#colorProducts)" 
+                    radius={[8, 8, 0, 0]}
+                    maxBarSize={60}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+              <div className="mt-4 flex items-center justify-between bg-[#F8F8F8] p-3 rounded-lg">
+                <span className="text-sm font-medium text-[#333333]">Current Total:</span>
+                <span className="text-2xl font-bold text-[#1F4E79]">{stats?.total_products || 332}</span>
+              </div>
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader className="p-3 pb-0">
-              <CardTitle className="flex items-center gap-2 text-lg font-bold">
-                <TrendingUp className="h-5 w-5" strokeWidth={2.5} />
-                Top Products
+
+          {/* Total Users Chart */}
+          <Card className="shadow-md">
+            <CardHeader className="p-4 pb-2">
+              <CardTitle className="flex items-center gap-2 text-xl font-bold font-playfair text-[#0B0B0D]">
+                <Users2 className="h-6 w-6 text-[#2ECC71]" strokeWidth={2.5} />
+                Total Users Growth
               </CardTitle>
+              <p className="text-sm text-[#333333] mt-1">User registrations over the last 30 days</p>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-4 mt-2">
-                {topProducts.map((product, index) => (
-                  <div
-                    key={product.name}
-                    className="flex items-center justify-between p-4 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-lg gradient-driptyard flex items-center justify-center">
-                        <span className="text-white font-bold">{index + 1}</span>
-                      </div>
-                      <div>
-                        <p className="font-semibold text-sm">{product.name}</p>
-                        <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                          <Star className="h-3 w-3 fill-current text-accent" />
-                          {product.sales} sales
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold text-lg">{product.revenue}</p>
-                    </div>
-                  </div>
-                ))}
+            <CardContent className="p-4 pt-2">
+              <ResponsiveContainer width="100%" height={350}>
+                <AreaChart data={usersData}>
+                  <defs>
+                    <linearGradient id="colorUsers" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#2ECC71" stopOpacity={0.8}/>
+                      <stop offset="95%" stopColor="#2ECC71" stopOpacity={0.1}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E5E5" />
+                  <XAxis 
+                    dataKey="date" 
+                    stroke="#333333"
+                    style={{ fontSize: '12px', fontFamily: 'Inter' }}
+                  />
+                  <YAxis 
+                    stroke="#333333"
+                    style={{ fontSize: '12px', fontFamily: 'Inter' }}
+                  />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#F8F8F8',
+                      border: '1px solid #E0B74F',
+                      borderRadius: '8px',
+                      fontFamily: 'Inter'
+                    }}
+                    labelStyle={{ color: '#0B0B0D', fontWeight: 'bold' }}
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="count" 
+                    stroke="#2ECC71" 
+                    strokeWidth={3}
+                    fillOpacity={1} 
+                    fill="url(#colorUsers)" 
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+              <div className="mt-4 flex items-center justify-between bg-[#F8F8F8] p-3 rounded-lg">
+                <span className="text-sm font-medium text-[#333333]">Current Total:</span>
+                <span className="text-2xl font-bold text-[#2ECC71]">{stats?.total_users || 970}</span>
               </div>
             </CardContent>
           </Card>
