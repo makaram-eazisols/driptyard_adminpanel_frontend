@@ -70,7 +70,7 @@ function Users() {
         exclude_admins: true,
       });
       // Filter out admins and moderators on client side
-      const customerUsers = (data.users || []).filter((user) => !user.is_admin && !user.is_moderator && user.role !== "admin" && user.role !== "moderator");
+      const customerUsers = (data.users || []).filter((user) => !user.is_admin && !user.is_moderator );
       setUsers(customerUsers);
       setTotalPages(data.total_pages || 1);
       setTotalCount(data.total || customerUsers.length || 0);
@@ -263,7 +263,7 @@ function Users() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {users.map((user) => (
+                    {users?.map((user) => (
                       <TableRow key={user.id} className="hover:bg-muted/30 transition-colors">
                         <TableCell className="py-3 px-4">
                           <p className="font-semibold text-sm text-primary leading-tight">{user?.username || "Unknown User"}</p>
