@@ -5,7 +5,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Edit2, Trash2, Loader2, MoreVertical, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Edit2, Trash2, Loader2, MoreVertical, ChevronLeft, ChevronRight, Eye, Ban, Unlock, KeyRound, EyeOff } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -52,6 +52,16 @@ function Users() {
   const [permissionsForm, setPermissionsForm] = useState(null);
   const [permissionsLoading, setPermissionsLoading] = useState(false);
   const [savingPermissions, setSavingPermissions] = useState(false);
+  const [viewUser, setViewUser] = useState(null);
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [viewLoading, setViewLoading] = useState(false);
+  const [suspendUserId, setSuspendUserId] = useState(null);
+  const [resetPasswordUserId, setResetPasswordUserId] = useState(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
 
   // Check manage users permission
   const canManageUsers = user?.is_admin || user?.permissions?.can_manage_users === true;
@@ -76,7 +86,8 @@ function Users() {
       setTotalCount(data.total || customerUsers.length || 0);
       setPageSize(data.page_size || 10);
     } catch (error) {
-      notifyError("Failed to fetch users");
+      console.error("Failed to fetch users:", error);
+      notifyError(error.response?.data?.detail || "Failed to fetch users");
     } finally {
       setLoading(false);
     }
@@ -108,7 +119,8 @@ function Users() {
 
     try {
       setEditLoading(true);
-      await apiClient.updateAdminUser(editUser.id, {
+      const userId = editUser.id || editUser.user_id;
+      await apiClient.updateAdminUser(userId, {
         first_name: editUser.first_name,
         last_name: editUser.last_name,
         email: editUser.email,
@@ -116,13 +128,15 @@ function Users() {
         is_active: editUser.is_active,
         is_verified: editUser.is_verified,
       });
-      notifySuccess("User has been updated");
+      notifySuccess("User has been updated successfully");
       setIsEditDialogOpen(false);
       setEditUser(null);
       setActiveTab("user-edit");
       fetchUsers();
     } catch (error) {
-      notifyError("Failed to update user");
+      console.error("Failed to update user:", error);
+      const errorMessage = error.response?.data?.detail || error.response?.data?.message || "Failed to update user";
+      notifyError(errorMessage);
     } finally {
       setEditLoading(false);
     }
@@ -195,24 +209,111 @@ function Users() {
 
     try {
       await apiClient.deleteAdminUser(deleteUserId);
-      notifySuccess("User has been deleted");
+      notifySuccess("User has been permanently deleted");
       setDeleteUserId(null);
       fetchUsers();
     } catch (error) {
-      notifyError("Failed to delete user");
+      console.error("Failed to delete user:", error);
+      notifyError(error.response?.data?.detail || "Failed to delete user");
     }
   };
 
+  const handleViewUser = async (user) => {
+    try {
+      setViewLoading(true);
+      setIsViewDialogOpen(true);
+      const userId = user.id || user.user_id;
+      const userDetails = await apiClient.getUserDetails(userId);
+      setViewUser(userDetails);
+    } catch (error) {
+      console.error("Failed to fetch user details:", error);
+      notifyError(error.response?.data?.detail || "Failed to load user details");
+      setIsViewDialogOpen(false);
+    } finally {
+      setViewLoading(false);
+    }
+  };
+
+  const handleSuspendUser = async () => {
+    if (!suspendUserId) return;
+
+    try {
+      await apiClient.suspendAdminUser(suspendUserId);
+      notifySuccess("User has been suspended. They will be notified via email.");
+      setSuspendUserId(null);
+      fetchUsers();
+    } catch (error) {
+      console.error("Failed to suspend user:", error);
+      notifyError(error.response?.data?.detail || "Failed to suspend user");
+    }
+  };
+
+  const handleUnsuspendUser = async (userId) => {
+    try {
+      await apiClient.unsuspendAdminUser(userId);
+      notifySuccess("User has been reinstated. They will be notified via email.");
+      fetchUsers();
+    } catch (error) {
+      console.error("Failed to unsuspend user:", error);
+      notifyError(error.response?.data?.detail || "Failed to reinstate user");
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!resetPasswordUserId) return;
+
+    // Validation
+    if (!newPassword || !confirmPassword) {
+      notifyError("Please enter and confirm the new password");
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      notifyError("Password must be at least 6 characters long");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      notifyError("Passwords do not match");
+      return;
+    }
+
+    try {
+      setResetPasswordLoading(true);
+      await apiClient.resetUserPassword(resetPasswordUserId, newPassword);
+      notifySuccess("Password has been reset. User will be notified via email with their new password.");
+      setResetPasswordUserId(null);
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (error) {
+      console.error("Failed to reset password:", error);
+      notifyError(error.response?.data?.detail || "Failed to reset password");
+    } finally {
+      setResetPasswordLoading(false);
+    }
+  };
+
+
   const getStatusBadgeVariant = (user) => {
-    const isHealthy = !user.is_banned && user.is_active && user.is_verified;
-    return isHealthy ? "success" : "destructive";
+    if (user.is_banned || user.is_suspended || !user.is_active) {
+      return "destructive";
+    }
+    if (!user.is_verified) {
+      return "destructive";
+    }
+    return "success";
   };
 
   const getStatusText = (user) => {
     if (user.is_banned) return "Banned";
+    if (user.is_suspended) return "Suspended";
     if (!user.is_active) return "Inactive";
     if (!user.is_verified) return "Unverified";
     return "Active";
+  };
+
+  const handleUsernameDoubleClick = (user) => {
+    handleViewUser(user);
   };
 
   return (
@@ -255,6 +356,7 @@ function Users() {
                     <TableRow className="bg-muted/50 hover:bg-muted/50">
                       <TableHead className="h-12 px-4 font-semibold text-secondary">User Name</TableHead>
                       <TableHead className="h-12 px-4 font-semibold text-secondary">Email</TableHead>
+                      <TableHead className="h-12 px-4 font-semibold text-secondary">Listings</TableHead>
                       <TableHead className="h-12 px-4 font-semibold text-secondary">Status</TableHead>
                       <TableHead className="h-12 px-4 font-semibold text-secondary">Joined</TableHead>
                       {canManageUsers && (
@@ -266,10 +368,19 @@ function Users() {
                     {users?.map((user) => (
                       <TableRow key={user.id} className="hover:bg-muted/30 transition-colors">
                         <TableCell className="py-3 px-4">
-                          <p className="font-semibold text-sm text-primary leading-tight">{user?.username || "Unknown User"}</p>
+                          <p 
+                            className="font-semibold text-sm text-primary leading-tight cursor-pointer hover:text-accent transition-colors"
+                            onDoubleClick={() => handleUsernameDoubleClick(user)}
+                            title="Double-click to view details"
+                          >
+                            {user?.username || "Unknown User"}
+                          </p>
                         </TableCell>
                         <TableCell className="py-3 px-4">
                           <p className="text-sm text-foreground">{user.email}</p>
+                        </TableCell>
+                        <TableCell className="py-3 px-4">
+                          <p className="text-sm text-foreground">{user.listings_count || 0}</p>
                         </TableCell>
                         <TableCell className="py-3 px-4">
                           <Badge variant={getStatusBadgeVariant(user)} className="text-xs">{getStatusText(user)}</Badge>
@@ -286,9 +397,28 @@ function Users() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
+                                <DropdownMenuItem className="cursor-pointer" onClick={() => handleViewUser(user)}>
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  View
+                                </DropdownMenuItem>
                                 <DropdownMenuItem className="cursor-pointer" onClick={() => handleEditUser(user)}>
                                   <Edit2 className="h-4 w-4 mr-2" />
                                   Edit
+                                </DropdownMenuItem>
+                                {user.is_suspended ? (
+                                  <DropdownMenuItem className="cursor-pointer" onClick={() => handleUnsuspendUser(user.id)}>
+                                    <Unlock className="h-4 w-4 mr-2" />
+                                    Reinstate
+                                  </DropdownMenuItem>
+                                ) : (
+                                  <DropdownMenuItem className="cursor-pointer" onClick={() => setSuspendUserId(user.id)}>
+                                    <Ban className="h-4 w-4 mr-2" />
+                                    Suspend
+                                  </DropdownMenuItem>
+                                )}
+                                <DropdownMenuItem className="cursor-pointer" onClick={() => setResetPasswordUserId(user.id)}>
+                                  <KeyRound className="h-4 w-4 mr-2" />
+                                  Reset Password
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                   className="text-destructive cursor-pointer focus:text-destructive"
@@ -400,14 +530,14 @@ function Users() {
                     <Input id="email" type="email" value={editUser.email || ""} disabled />
                   </div>
                 </div>
-                <div className="flex items-center justify-between">
+                {/* <div className="flex items-center justify-between">
                   <Label htmlFor="is-active">Active</Label>
                   <Switch
                     id="is-active"
                     checked={!!editUser.is_active}
                     onCheckedChange={(checked) => setEditUser({ ...editUser, is_active: checked })}
                   />
-                </div>
+                </div> */}
                 <div className="flex items-center justify-between">
                   <Label htmlFor="is-verified">Verified</Label>
                   <Switch
@@ -609,9 +739,9 @@ function Users() {
         <AlertDialog open={!!deleteUserId} onOpenChange={() => setDeleteUserId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogTitle>Permanently Delete User?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete this user and all associated data. This action cannot be undone.
+              This will permanently delete this user and all associated data including their listings. This action cannot be undone. The deletion will be recorded in the system logs for auditing purposes.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -620,11 +750,244 @@ function Users() {
               onClick={handleDeleteUser}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Delete
+              Delete Permanently
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      )}
+
+      {/* Suspend Confirmation Dialog */}
+      {canManageUsers && (
+        <AlertDialog open={!!suspendUserId} onOpenChange={() => setSuspendUserId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Suspend User?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will suspend the user's account. They will be notified via email and will not be able to access their account until reinstated.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleSuspendUser}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Suspend
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      )}
+
+      {/* Reset Password Dialog */}
+      {canManageUsers && (
+        <Dialog open={!!resetPasswordUserId} onOpenChange={(open) => {
+          if (!open) {
+            setResetPasswordUserId(null);
+            setNewPassword("");
+            setConfirmPassword("");
+            setShowPassword(false);
+            setShowConfirmPassword(false);
+          }
+        }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Reset User Password</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="new-password">New Password</Label>
+                <div className="relative">
+                  <Input
+                    id="new-password"
+                    type={showPassword ? "text" : "password"}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Enter new password"
+                    disabled={resetPasswordLoading}
+                    className="pr-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    onClick={() => setShowPassword(!showPassword)}
+                    disabled={resetPasswordLoading}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-muted-foreground" />
+                    )}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">Password must be at least 6 characters long</p>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="confirm-password">Confirm Password</Label>
+                <div className="relative">
+                  <Input
+                    id="confirm-password"
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Confirm new password"
+                    disabled={resetPasswordLoading}
+                    className="pr-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    disabled={resetPasswordLoading}
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOff className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-muted-foreground" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                The user will receive an email notification with their new password.
+              </p>
+            </div>
+            <div className="flex justify-end gap-2 pt-4 border-t border-border">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setResetPasswordUserId(null);
+                  setNewPassword("");
+                  setConfirmPassword("");
+                  setShowPassword(false);
+                  setShowConfirmPassword(false);
+                }}
+                disabled={resetPasswordLoading}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleResetPassword}
+                className="gradient-driptyard-hover text-white"
+                disabled={resetPasswordLoading || !newPassword || !confirmPassword}
+              >
+                {resetPasswordLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Reset Password
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+
+      {/* View User Details Dialog */}
+      {canManageUsers && (
+        <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>User Details</DialogTitle>
+            </DialogHeader>
+            {viewLoading ? (
+              <div className="space-y-4 py-8">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <Skeleton key={i} className="h-12 w-full" />
+                ))}
+              </div>
+            ) : viewUser ? (
+              <div className="space-y-6 py-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="grid gap-2">
+                    <Label className="text-muted-foreground">Username</Label>
+                    <p className="text-sm font-medium">{viewUser.username || "N/A"}</p>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label className="text-muted-foreground">Email</Label>
+                    <p className="text-sm font-medium">{viewUser.email || "N/A"}</p>
+                  </div>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="grid gap-2">
+                    <Label className="text-muted-foreground">First Name</Label>
+                    <p className="text-sm font-medium">{viewUser.first_name || "N/A"}</p>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label className="text-muted-foreground">Last Name</Label>
+                    <p className="text-sm font-medium">{viewUser.last_name || "N/A"}</p>
+                  </div>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="grid gap-2">
+                    <Label className="text-muted-foreground">Phone</Label>
+                    <p className="text-sm font-medium">{viewUser.phone || "N/A"}</p>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label className="text-muted-foreground">Listings Count</Label>
+                    <p className="text-sm font-medium">{viewUser.listings_count || 0}</p>
+                  </div>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="grid gap-2">
+                    <Label className="text-muted-foreground">Status</Label>
+                    <Badge variant={getStatusBadgeVariant(viewUser)} className="text-xs w-fit">
+                      {getStatusText(viewUser)}
+                    </Badge>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label className="text-muted-foreground">Verified</Label>
+                    <Badge variant={viewUser.is_verified ? "success" : "destructive"} className="text-xs w-fit">
+                      {viewUser.is_verified ? "Verified" : "Unverified"}
+                    </Badge>
+                  </div>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="grid gap-2">
+                    <Label className="text-muted-foreground">Joined Date</Label>
+                    <p className="text-sm font-medium">
+                      {viewUser.created_at ? format(new Date(viewUser.created_at), "MMM dd, yyyy HH:mm") : "N/A"}
+                    </p>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label className="text-muted-foreground">Last Updated</Label>
+                    <p className="text-sm font-medium">
+                      {viewUser.updated_at ? format(new Date(viewUser.updated_at), "MMM dd, yyyy HH:mm") : "N/A"}
+                    </p>
+                  </div>
+                </div>
+                {viewUser.bio && (
+                  <div className="grid gap-2">
+                    <Label className="text-muted-foreground">Bio</Label>
+                    <p className="text-sm">{viewUser.bio}</p>
+                  </div>
+                )}
+                <div className="flex justify-end gap-2 pt-4 border-t border-border">
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsViewDialogOpen(false)}
+                  >
+                    Close
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setIsViewDialogOpen(false);
+                      handleEditUser(viewUser);
+                    }}
+                    className="gradient-driptyard-hover text-white"
+                  >
+                    <Edit2 className="h-4 w-4 mr-2" />
+                    Edit User
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground py-4">No user data available</p>
+            )}
+          </DialogContent>
+        </Dialog>
       )}
     </AdminLayout>
   );

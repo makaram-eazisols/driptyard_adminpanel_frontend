@@ -325,6 +325,28 @@ class ApiClient {
     return response.data;
   }
 
+  async suspendAdminUser(userId) {
+    const response = await this.client.post(`/admin/users/${userId}/suspend`);
+    return response.data;
+  }
+
+  async unsuspendAdminUser(userId) {
+    const response = await this.client.post(`/admin/users/${userId}/unsuspend`);
+    return response.data;
+  }
+
+  async resetUserPassword(userId, newPassword) {
+    const response = await this.client.post(`/admin/users/${userId}/reset-password`, {
+      new_password: newPassword
+    });
+    return response.data;
+  }
+
+  async getUserDetails(userId) {
+    const response = await this.client.get(`/admin/users/${userId}`);
+    return response.data;
+  }
+
   // ============ ADMIN REPORTS ENDPOINTS ============
   async getAdminReports(params) {
     const response = await this.client.get("/admin/reports", { params });
