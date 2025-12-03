@@ -5,7 +5,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, MoreVertical, Edit2, Trash2, Loader2, ChevronLeft, ChevronRight, Star, X } from "lucide-react";
+import { Search, MoreVertical, Edit2, Trash2, Loader2, ChevronLeft, ChevronRight, Star, X, Filter } from "lucide-react";
 import { format } from "date-fns";
 import { apiClient } from "@/lib/api-client";
 import { notifyError, notifySuccess } from "@/lib/toast";
@@ -49,6 +49,9 @@ function Products() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [status, setStatus] = useState("all");
+  const [verification, setVerification] = useState("all");
+  const [showFilters, setShowFilters] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
@@ -74,14 +77,47 @@ function Products() {
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const data = await apiClient.getAdminProducts({
+      const params = {
         page,
         page_size: 10,
         search: searchQuery || undefined,
-      });
-      setProducts(data.products || []);
+      };
+
+      if (status && status !== "all") {
+        if (status === "active") {
+          params.is_active = true;
+        } else if (status === "inactive") {
+          params.is_active = false;
+        }
+      }
+
+      if (verification && verification !== "all") {
+        if (verification === "verified") {
+          params.is_verified = true;
+        } else if (verification === "unverified") {
+          params.is_verified = false;
+        }
+      }
+
+      const data = await apiClient.getAdminProducts(params);
+      let items = data.products || [];
+      
+      // Apply client-side filtering if needed
+      if (status === "active") {
+        items = items.filter((product) => product.is_active);
+      } else if (status === "inactive") {
+        items = items.filter((product) => !product.is_active);
+      }
+      
+      if (verification === "verified") {
+        items = items.filter((product) => product.is_verified);
+      } else if (verification === "unverified") {
+        items = items.filter((product) => !product.is_verified);
+      }
+      
+      setProducts(items);
       setTotalPages(data.total_pages || 1);
-      setTotalCount(data.total || 0);
+      setTotalCount(data.total || items.length || 0);
       setPageSize(data.page_size || 10);
     } catch (error) {
       notifyError("Failed to load products");
@@ -90,9 +126,30 @@ function Products() {
     }
   };
 
+  const handleClearFilters = () => {
+    setSearchQuery("");
+    setStatus("all");
+    setVerification("all");
+    setPage(1);
+  };
+
+  const STATUS_OPTIONS = [
+    { value: "all", label: "All Status" },
+    { value: "active", label: "Active" },
+    { value: "inactive", label: "Inactive" },
+  ];
+
+  const VERIFICATION_OPTIONS = [
+    { value: "all", label: "All Verification" },
+    { value: "verified", label: "Verified" },
+    { value: "unverified", label: "Unverified" },
+  ];
+
+  const hasActiveFilters = searchQuery || (status && status !== "all") || (verification && verification !== "all");
+
   useEffect(() => {
     fetchProducts();
-  }, [page, searchQuery]);
+  }, [page, searchQuery, status, verification]);
 
   useEffect(() => {
     if (spotlightProduct) {
@@ -272,19 +329,84 @@ const formatPrice = (value) => {
             <h1 className="text-3xl font-bold text-secondary">Listings Management</h1>
             <p className="text-muted-foreground mt-1">Manage your product inventory</p>
           </div>
-          <div className="relative w-full max-w-sm md:max-w-xs">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search products..."
-              className="pl-10 bg-background"
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setPage(1);
-              }}
-            />
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowFilters(!showFilters)}
+              className="flex items-center gap-2"
+            >
+              <Filter className="h-4 w-4" />
+              Filters
+              {hasActiveFilters && (
+                <Badge variant="secondary" className="ml-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs">
+                  {[searchQuery, status && status !== "all" ? status : null, verification && verification !== "all" ? verification : null].filter(Boolean).length}
+                </Badge>
+              )}
+            </Button>
+            {hasActiveFilters && (
+              <Button variant="ghost" size="sm" onClick={handleClearFilters}>
+                <X className="h-4 w-4 mr-2" />
+                Clear
+              </Button>
+            )}
           </div>
         </div>
+
+        {/* Filters */}
+        {showFilters && (
+          <div className="rounded-lg border border-border bg-background p-4 space-y-4">
+            <div className="flex flex-wrap gap-4">
+              <div className="space-y-2 w-full md:w-auto md:min-w-[250px]">
+                <Label htmlFor="search">Search</Label>
+                <Input
+                  id="search"
+                  placeholder="Search products..."
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setPage(1);
+                  }}
+                />
+              </div>
+              <div className="space-y-2 w-full md:w-auto md:min-w-[200px]">
+                <Label htmlFor="status">Status</Label>
+                <Select value={status} onValueChange={(value) => {
+                  setStatus(value);
+                  setPage(1);
+                }}>
+                  <SelectTrigger id="status">
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STATUS_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2 w-full md:w-auto md:min-w-[200px]">
+                <Label htmlFor="verification">Verification</Label>
+                <Select value={verification} onValueChange={(value) => {
+                  setVerification(value);
+                  setPage(1);
+                }}>
+                  <SelectTrigger id="verification">
+                    <SelectValue placeholder="Select verification" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {VERIFICATION_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+        )}
         {/* <div className="rounded-2xl border border-border bg-background shadow-sm"> */}
           <div >
             {loading ? (

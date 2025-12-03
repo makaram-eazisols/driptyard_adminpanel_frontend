@@ -13,7 +13,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Search, Edit, ChevronLeft, ChevronRight, Loader2, Plus } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Search, Edit, ChevronLeft, ChevronRight, Loader2, Plus, Filter, X } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiClient } from "@/lib/api-client";
 import { notifyError, notifySuccess } from "@/lib/toast";
@@ -24,6 +25,8 @@ function RolesAndPermissions() {
   const [moderators, setModerators] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [status, setStatus] = useState("all");
+  const [showFilters, setShowFilters] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
@@ -52,12 +55,30 @@ function RolesAndPermissions() {
   const fetchModerators = async () => {
     try {
       setLoading(true);
-      const response = await apiClient.getModerators({
+      const params = {
         page: currentPage,
         page_size: pageSize,
         search: searchQuery || undefined,
-      });
-      const items = response.moderators || [];
+      };
+
+      if (status && status !== "all") {
+        if (status === "active") {
+          params.is_active = true;
+        } else if (status === "inactive") {
+          params.is_active = false;
+        }
+      }
+
+      const response = await apiClient.getModerators(params);
+      let items = response.moderators || [];
+      
+      // Apply client-side status filtering if needed
+      if (status === "active") {
+        items = items.filter((moderator) => moderator.is_active !== false);
+      } else if (status === "inactive") {
+        items = items.filter((moderator) => moderator.is_active === false);
+      }
+      
       setModerators(items);
       setTotalPages(response.total_pages || 1);
       setTotalCount(response.total || items.length || 0);
@@ -70,9 +91,23 @@ function RolesAndPermissions() {
     }
   };
 
+  const handleClearFilters = () => {
+    setSearchQuery("");
+    setStatus("all");
+    setCurrentPage(1);
+  };
+
+  const STATUS_OPTIONS = [
+    { value: "all", label: "All Status" },
+    { value: "active", label: "Active" },
+    { value: "inactive", label: "Inactive" },
+  ];
+
+  const hasActiveFilters = searchQuery || (status && status !== "all");
+
   useEffect(() => {
     fetchModerators();
-  }, [currentPage, searchQuery]);
+  }, [currentPage, searchQuery, status]);
 
   const openPermissionsDialog = async (moderator) => {
     setSelectedModerator(moderator);
@@ -300,34 +335,79 @@ function RolesAndPermissions() {
   return (
     <AdminLayout>
       <div className="space-y-2">
-        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
               <h1 className="text-3xl font-bold text-secondary">Users</h1>
               <p className="text-muted-foreground mt-1">View moderators and their access</p>
             </div>
-            <div className="relative w-full max-w-sm md:max-w-xs">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search moderators..."
-                className="pl-10 bg-background"
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  setCurrentPage(1);
-                }}
-              />
+            <div className="flex gap-2 items-center">
+              <Button
+                variant="outline"
+                onClick={() => setShowFilters(!showFilters)}
+                className="flex items-center gap-2"
+              >
+                <Filter className="h-4 w-4" />
+                Filters
+                {hasActiveFilters && (
+                  <Badge variant="secondary" className="ml-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs">
+                    {[searchQuery, status && status !== "all" ? status : null].filter(Boolean).length}
+                  </Badge>
+                )}
+              </Button>
+              {hasActiveFilters && (
+                <Button variant="ghost" size="sm" onClick={handleClearFilters}>
+                  <X className="h-4 w-4 mr-2" />
+                  Clear
+                </Button>
+              )}
+              <Button
+                onClick={handleOpenCreateDialog}
+                className="gradient-driptyard-hover text-white"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add User
+              </Button>
             </div>
           </div>
-          <div className="flex justify-end">
-            <Button
-              onClick={handleOpenCreateDialog}
-              className="gradient-driptyard-hover text-white"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add User
-            </Button>
-          </div>
+
+          {/* Filters */}
+          {showFilters && (
+            <div className="rounded-lg border border-border bg-background p-4 space-y-4">
+              <div className="flex flex-wrap gap-4">
+                <div className="space-y-2 w-full md:w-auto md:min-w-[250px]">
+                  <Label htmlFor="search">Search</Label>
+                  <Input
+                    id="search"
+                    placeholder="Search moderators..."
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                  />
+                </div>
+                <div className="space-y-2 w-full md:w-auto md:min-w-[200px]">
+                  <Label htmlFor="status">Status</Label>
+                  <Select value={status} onValueChange={(value) => {
+                    setStatus(value);
+                    setCurrentPage(1);
+                  }}>
+                    <SelectTrigger id="status">
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {STATUS_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         <div>

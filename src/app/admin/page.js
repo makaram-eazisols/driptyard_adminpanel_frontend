@@ -4,7 +4,7 @@ import { AdminLayout } from "@/components/admin/AdminLayout";
 import { StatCard } from "@/components/admin/StatCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users2, Package2, AlertCircle, Flag } from "lucide-react";
+import { Users2, Package2, AlertCircle, Flag, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { apiClient } from "@/lib/api-client";
 import { notifyError } from "@/lib/toast";
@@ -126,20 +126,23 @@ export default function Dashboard() {
                 change={formatChange(stats?.users_change)}
                 icon={Users2}
                 trend={stats?.users_change >= 0 ? "up" : "down"}
+                href="/admin/users"
               />
               <StatCard
-                title="Total Products"
+                title="Total active listings"
                 value={stats?.total_products?.toString() || "0"}
                 change={formatChange(stats?.products_change)}
                 icon={Package2}
                 trend={stats?.products_change >= 0 ? "up" : "down"}
+                href="/admin/products"
               />
               <StatCard
-                title="Pending Verifications"
-                value={stats?.pending_verifications?.toString() || "0"}
-                change={formatChange(stats?.pending_verifications_change)}
-                icon={AlertCircle}
-                trend={stats?.pending_verifications_change >= 0 ? "up" : "down"}
+                title="Total Listings Removed"
+                value={stats?.total_listings_removed?.toString() || "0"}
+                change={formatChange(stats?.listings_removed_change)}
+                icon={Trash2}
+                trend={stats?.listings_removed_change >= 0 ? "up" : "down"}
+                href="/admin/products"
               />
               <StatCard
                 title="Flagged Content"
@@ -147,6 +150,7 @@ export default function Dashboard() {
                 change={formatChange(stats?.flagged_content_change)}
                 icon={Flag}
                 trend={stats?.flagged_content_change >= 0 ? "up" : "down"}
+                href="/admin/flagged"
               />
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">

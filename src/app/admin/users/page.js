@@ -5,7 +5,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Edit2, Trash2, Loader2, MoreVertical, ChevronLeft, ChevronRight, Eye, Ban, Unlock, KeyRound, EyeOff } from "lucide-react";
+import { Search, Edit2, Trash2, Loader2, MoreVertical, ChevronLeft, ChevronRight, Filter, X, Eye, Ban, Unlock, KeyRound, EyeOff } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -30,6 +30,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiClient } from "@/lib/api-client";
 import { notifyError, notifySuccess } from "@/lib/toast";
 import { format } from "date-fns";
@@ -40,6 +41,8 @@ function Users() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [status, setStatus] = useState("all");
+  const [showFilters, setShowFilters] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
@@ -68,19 +71,37 @@ function Users() {
 
   useEffect(() => {
     fetchUsers();
-  }, [currentPage, searchTerm]);
+  }, [currentPage, searchTerm, status]);
 
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const data = await apiClient.getAdminUsers({
+      const params = {
         page: currentPage,
         page_size: 10,
         search: searchTerm || undefined,
         exclude_admins: true,
-      });
+      };
+
+      if (status && status !== "all") {
+        if (status === "active") {
+          params.is_active = true;
+        } else if (status === "inactive") {
+          params.is_active = false;
+        }
+      }
+
+      const data = await apiClient.getAdminUsers(params);
       // Filter out admins and moderators on client side
-      const customerUsers = (data.users || []).filter((user) => !user.is_admin && !user.is_moderator );
+      let customerUsers = (data.users || []).filter((user) => !user.is_admin && !user.is_moderator);
+      
+      // Apply client-side status filtering if needed
+      if (status === "active") {
+        customerUsers = customerUsers.filter((user) => user.is_active && !user.is_banned && user.is_verified);
+      } else if (status === "inactive") {
+        customerUsers = customerUsers.filter((user) => !user.is_active || user.is_banned || !user.is_verified);
+      }
+      
       setUsers(customerUsers);
       setTotalPages(data.total_pages || 1);
       setTotalCount(data.total || customerUsers.length || 0);
@@ -92,6 +113,20 @@ function Users() {
       setLoading(false);
     }
   };
+
+  const handleClearFilters = () => {
+    setSearchTerm("");
+    setStatus("all");
+    setCurrentPage(1);
+  };
+
+  const STATUS_OPTIONS = [
+    { value: "all", label: "All Status" },
+    { value: "active", label: "Active" },
+    { value: "inactive", label: "Inactive" },
+  ];
+
+  const hasActiveFilters = searchTerm || (status && status !== "all");
 
   const handleEditUser = async (user) => {
     setEditUser({ ...user });
@@ -324,19 +359,66 @@ function Users() {
             <h1 className="text-3xl font-bold text-secondary">Customers</h1>
             <p className="text-muted-foreground mt-1">Manage customer accounts and permissions</p>
           </div>
-          <div className="relative w-full max-w-sm md:max-w-xs">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search customers..."
-              className="pl-10 bg-background"
-              value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setCurrentPage(1);
-              }}
-            />
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowFilters(!showFilters)}
+              className="flex items-center gap-2"
+            >
+              <Filter className="h-4 w-4" />
+              Filters
+              {hasActiveFilters && (
+                <Badge variant="secondary" className="ml-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs">
+                  {[searchTerm, status && status !== "all" ? status : null].filter(Boolean).length}
+                </Badge>
+              )}
+            </Button>
+            {hasActiveFilters && (
+              <Button variant="ghost" size="sm" onClick={handleClearFilters}>
+                <X className="h-4 w-4 mr-2" />
+                Clear
+              </Button>
+            )}
           </div>
         </div>
+
+        {/* Filters */}
+        {showFilters && (
+          <div className="rounded-lg border border-border bg-background p-4 space-y-4">
+            <div className="flex flex-wrap gap-4">
+              <div className="space-y-2 w-full md:w-auto md:min-w-[250px]">
+                <Label htmlFor="search">Search</Label>
+                <Input
+                  id="search"
+                  placeholder="Search customers..."
+                  value={searchTerm}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                />
+              </div>
+              <div className="space-y-2 w-full md:w-auto md:min-w-[200px]">
+                <Label htmlFor="status">Status</Label>
+                <Select value={status} onValueChange={(value) => {
+                  setStatus(value);
+                  setCurrentPage(1);
+                }}>
+                  <SelectTrigger id="status">
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STATUS_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+        )}
         <div>
           {loading ? (
             <div className="space-y-4">

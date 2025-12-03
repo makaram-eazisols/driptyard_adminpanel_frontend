@@ -45,8 +45,20 @@ const buildMenuItems = (user) => {
     items.push({ title: "Dashboard", url: "/admin", icon: Home, end: true });
   }
 
+  // Users dropdown with Customers and Moderator
+  const usersChildren = [];
   if (can("can_see_users")) {
-    items.push({ title: "Customers", url: "/admin/users", icon: Users2 });
+    usersChildren.push({ title: "Customers", url: "/admin/users", icon: Users2 });
+  }
+  if (isAdmin || user?.role === "admin") {
+    usersChildren.push({ title: "Moderators", url: "/admin/roles-permissions", icon: Shield });
+  }
+  if (usersChildren.length > 0) {
+    items.push({
+      title: "Users",
+      icon: Users2,
+      children: usersChildren,
+    });
   }
 
   if (can("can_see_listings")) {
@@ -65,11 +77,6 @@ const buildMenuItems = (user) => {
     items.push({ title: "Flagged Content", url: "/admin/flagged", icon: Flag });
   }
 
-  // Only admins see Roles & Permissions management
-  if (isAdmin || user?.role === "admin") {
-    items.push({ title: "Users", url: "/admin/roles-permissions", icon: Shield });
-  }
-
   return items;
 };
 
@@ -83,11 +90,14 @@ export function AdminSidebar() {
   });
 
   useEffect(() => {
+    // Only auto-open dropdown if pathname matches a child URL
+    // This ensures the correct dropdown is open when navigating directly to a child page
     const parent = menuItems.find((item) => item.children?.some((child) => pathname?.startsWith(child.url)));
     if (parent) {
       setOpenMenu(parent.title);
     }
-  }, [pathname, menuItems]);
+    // Don't close dropdowns when pathname doesn't match - let user control it manually
+  }, [pathname]);
 
   return (
     <Sidebar className="border-r border-border bg-card" collapsible="offcanvas">
@@ -115,8 +125,18 @@ export function AdminSidebar() {
                   return (
                     <SidebarMenuItem key={item.title}>
                       <SidebarMenuButton
-                        onClick={() => setOpenMenu(isExpanded ? null : item.title)}
-                        className="group flex items-center justify-between rounded-lg px-3 py-2.5 text-foreground/70 hover:bg-muted hover:text-foreground"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          // If this dropdown is already open, close it
+                          if (isExpanded) {
+                            setOpenMenu(null);
+                          } else {
+                            // Otherwise, close any open dropdown and open this one
+                            setOpenMenu(item.title);
+                          }
+                        }}
+                        className="group flex items-center justify-between rounded-lg px-3 py-2.5 text-foreground/70 hover:bg-muted hover:text-foreground cursor-pointer"
                         isActive={item.children?.some((child) => pathname?.startsWith(child.url))}
                       >
                         <div className="flex items-center gap-3">

@@ -137,9 +137,10 @@ class ApiClient {
     return response.data;
   }
 
-  async verifyPasswordReset(code, new_password) {
+  async verifyPasswordReset(email, reset_token, new_password) {
     const response = await this.client.post("/auth/password-reset/verify", {
-      code,
+      email,
+      reset_token,
       new_password,
     });
     return response.data;

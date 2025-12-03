@@ -20,7 +20,6 @@ import { format } from "date-fns";
 const STATUS_OPTIONS = [
   { value: "all", label: "All Status" },
   { value: "applied", label: "Applied" },
-  { value: "removed", label: "Removed" },
   { value: "expired", label: "Expired" },
 ];
 
@@ -99,8 +98,8 @@ function Spotlight() {
     if (action === "applied") {
       return <Badge variant="success" className="text-xs">Applied</Badge>;
     }
-    if (action === "removed" || action === "expired") {
-      return <Badge variant="destructive" className="text-xs">{action.charAt(0).toUpperCase() + action.slice(1)}</Badge>;
+    if (action === "expired") {
+      return <Badge variant="destructive" className="text-xs">Expired</Badge>;
     }
     return <Badge variant="outline" className="text-xs">{action || "—"}</Badge>;
   };
@@ -264,8 +263,22 @@ function Spotlight() {
                 </TableHeader>
                 <TableBody>
                   {history.map((item) => {
+                    const productId = item.product_id;
+                    const websiteUrl = process.env.NEXT_PUBLIC_WEBSITE_URL || "https://driptyard-finalized-frontend.vercel.app";
+                    const productUrl = productId ? `${websiteUrl}${productId}` : null;
+                    
+                    const handleRowClick = () => {
+                      if (productUrl) {
+                        window.open(productUrl, "_blank");
+                      }
+                    };
+                    
                     return (
-                      <TableRow key={item.id || item.spotlight_id} className="hover:bg-muted/30 transition-colors">
+                      <TableRow 
+                        key={item.id || item.spotlight_id} 
+                        className={`hover:bg-muted/30 transition-colors ${productUrl ? "cursor-pointer" : ""}`}
+                        onDoubleClick={productUrl ? handleRowClick : undefined}
+                      >
                         <TableCell className="py-3 px-4 max-w-[300px]">
                           <div className="flex items-start gap-3">
                             <div className="h-12 w-12 rounded-lg border border-border overflow-hidden bg-muted/50 shadow-sm flex-shrink-0">
