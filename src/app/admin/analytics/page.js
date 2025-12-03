@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { DollarSign, Users2, Package2 } from "lucide-react";
 
 function Analytics() {
+  //test
   return (
     <AdminLayout>
       <div className="space-y-6">
