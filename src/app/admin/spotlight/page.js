@@ -265,7 +265,14 @@ function Spotlight() {
                   {history.map((item) => {
                     const productId = item.product_id;
                     const websiteUrl = process.env.NEXT_PUBLIC_WEBSITE_URL || "https://driptyard-finalized-frontend.vercel.app";
-                    const productUrl = productId ? `${websiteUrl}${productId}` : null;
+                    // Ensure proper URL construction with /products/ path
+                    // Remove trailing slash and check if /products/ already exists
+                    let baseUrl = websiteUrl.endsWith('/') ? websiteUrl.slice(0, -1) : websiteUrl;
+                    // If baseUrl already ends with /products, use it as is, otherwise add /products
+                    if (!baseUrl.endsWith('/products')) {
+                      baseUrl = `${baseUrl}/products`;
+                    }
+                    const productUrl = productId ? `${baseUrl}/${productId}` : null;
                     
                     const handleRowClick = () => {
                       if (productUrl) {
