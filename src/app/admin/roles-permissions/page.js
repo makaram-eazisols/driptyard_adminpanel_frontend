@@ -8,20 +8,39 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Edit, ChevronLeft, ChevronRight, Loader2, Plus, Filter, X } from "lucide-react";
+import { Search, Edit, ChevronLeft, ChevronRight, Loader2, Plus, Filter, X, Eye, Ban, Unlock, KeyRound, Trash2, MoreVertical, EyeOff, Edit2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiClient } from "@/lib/api-client";
 import { notifyError, notifySuccess } from "@/lib/toast";
 import PhoneInput from "react-phone-number-input";
 import "react-phone-number-input/style.css";
+import { format } from "date-fns";
+import { useAuth } from "@/hooks/use-auth";
 
 function RolesAndPermissions() {
+  const { user } = useAuth();
   const [moderators, setModerators] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -50,6 +69,18 @@ function RolesAndPermissions() {
   });
   const [createLoading, setCreateLoading] = useState(false);
   const [phoneValue, setPhoneValue] = useState("");
+  const [viewUser, setViewUser] = useState(null);
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [viewLoading, setViewLoading] = useState(false);
+  const [suspendUserId, setSuspendUserId] = useState(null);
+  const [resetPasswordUserId, setResetPasswordUserId] = useState(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showCreatePassword, setShowCreatePassword] = useState(false);
+  const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
+  const [deleteUserId, setDeleteUserId] = useState(null);
 
   // Fetch moderators
   const fetchModerators = async () => {
@@ -126,6 +157,10 @@ function RolesAndPermissions() {
     } finally {
       setPermissionsLoading(false);
     }
+  };
+
+  const handleEditUser = async (moderator) => {
+    await openPermissionsDialog(moderator);
   };
 
   const handleTogglePermission = (field) => {
@@ -275,6 +310,135 @@ function RolesAndPermissions() {
     }));
   };
 
+  // Check manage users permission
+  const canManageUsers = user?.is_admin || user?.permissions?.can_manage_users === true;
+
+  const handleViewUser = async (moderator) => {
+    try {
+      setViewLoading(true);
+      setIsViewDialogOpen(true);
+      const userId = moderator.id || moderator.user_id;
+      const userDetails = await apiClient.getUserDetails(userId);
+      setViewUser(userDetails);
+    } catch (error) {
+      console.error("Failed to fetch user details:", error);
+      notifyError(error.response?.data?.detail || "Failed to load user details");
+      setIsViewDialogOpen(false);
+    } finally {
+      setViewLoading(false);
+    }
+  };
+
+  const handleSuspendUser = async () => {
+    if (!suspendUserId) return;
+
+    try {
+      await apiClient.suspendAdminUser(suspendUserId);
+      notifySuccess("User has been suspended. They will be notified via email.");
+      setSuspendUserId(null);
+      fetchModerators();
+    } catch (error) {
+      console.error("Failed to suspend user:", error);
+      notifyError(error.response?.data?.detail || "Failed to suspend user");
+    }
+  };
+
+  const handleUnsuspendUser = async (userId) => {
+    try {
+      await apiClient.unsuspendAdminUser(userId);
+      notifySuccess("User has been reinstated. They will be notified via email.");
+      fetchModerators();
+    } catch (error) {
+      console.error("Failed to unsuspend user:", error);
+      notifyError(error.response?.data?.detail || "Failed to reinstate user");
+    }
+  };
+
+  const handleReinstateUser = async (moderator) => {
+    const userId = moderator.id || moderator.user_id;
+    
+    try {
+      // If user is suspended, unsuspend them
+      if (moderator.is_suspended) {
+        await apiClient.unsuspendAdminUser(userId);
+        notifySuccess("User has been reinstated. They will be notified via email.");
+      } 
+      // If user is inactive, activate them
+      else if (!moderator.is_active) {
+        await apiClient.updateAdminUser(userId, {
+          is_active: true,
+        });
+        notifySuccess("User has been activated successfully.");
+      }
+      fetchModerators();
+    } catch (error) {
+      console.error("Failed to reinstate user:", error);
+      notifyError(error.response?.data?.detail || "Failed to reinstate user");
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!resetPasswordUserId) return;
+
+    // Validation
+    if (!newPassword || !confirmPassword) {
+      notifyError("Please enter and confirm the new password");
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      notifyError("Password must be at least 6 characters long");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      notifyError("Passwords do not match");
+      return;
+    }
+
+    try {
+      setResetPasswordLoading(true);
+      await apiClient.resetUserPassword(resetPasswordUserId, newPassword);
+      notifySuccess("Password has been reset. User will be notified via email with their new password.");
+      setResetPasswordUserId(null);
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (error) {
+      console.error("Failed to reset password:", error);
+      notifyError(error.response?.data?.detail || "Failed to reset password");
+    } finally {
+      setResetPasswordLoading(false);
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!deleteUserId) return;
+
+    try {
+      await apiClient.deleteAdminUser(deleteUserId);
+      notifySuccess("User has been permanently deleted");
+      setDeleteUserId(null);
+      fetchModerators();
+    } catch (error) {
+      console.error("Failed to delete user:", error);
+      notifyError(error.response?.data?.detail || "Failed to delete user");
+    }
+  };
+
+  const getStatusBadgeVariant = (moderator) => {
+    if (moderator.is_banned || moderator.is_suspended || !moderator.is_active) {
+      return "destructive";
+    }
+    return "success";
+  };
+
+  const getStatusText = (moderator) => {
+    if (moderator.is_banned) return "Banned";
+    if (moderator.is_suspended) return "Suspended";
+    if (!moderator.is_active) return "Inactive";
+    return "Active";
+  };
+
   const handleCreateUser = async () => {
     // Validation
     if (!createUserForm.email || !createUserForm.password || !createUserForm.username || !phoneValue || !createUserForm.role) {
@@ -338,7 +502,7 @@ function RolesAndPermissions() {
           <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-secondary">Users</h1>
+              <h1 className="text-3xl font-bold text-secondary">Moderators</h1>
               <p className="text-muted-foreground mt-1">View moderators and their access</p>
             </div>
             <div className="flex gap-2 items-center">
@@ -429,11 +593,14 @@ function RolesAndPermissions() {
                     <TableRow className="bg-muted/50 hover:bg-muted/50">
                       <TableHead className="h-12 px-4 font-semibold text-secondary">Name</TableHead>
                       <TableHead className="h-12 px-4 font-semibold text-secondary">Email</TableHead>
-                      <TableHead className="h-12 px-4 font-semibold text-secondary">Role</TableHead>
+                      {/* <TableHead className="h-12 px-4 font-semibold text-secondary">Role</TableHead> */}
                       <TableHead className="h-12 px-4 font-semibold text-secondary">Status</TableHead>
-                      <TableHead className="h-12 px-4 text-right font-semibold text-secondary">
-                        Actions
-                      </TableHead>
+                      <TableHead className="h-12 px-4 font-semibold text-secondary">Joined</TableHead>
+                      {canManageUsers && (
+                        <TableHead className="h-12 px-4 text-right font-semibold text-secondary">
+                          Actions
+                        </TableHead>
+                      )}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -453,28 +620,64 @@ function RolesAndPermissions() {
                         <TableCell className="py-3 px-4">
                           <p className="text-sm text-foreground">{moderator.email}</p>
                         </TableCell>
-                        <TableCell className="py-3 px-4">
+                        {/* <TableCell className="py-3 px-4">
                           <Badge variant="outline" className="text-xs">
                             {moderator.is_moderator ? "Moderator" : "User"}
                           </Badge>
-                        </TableCell>
+                        </TableCell> */}
                         <TableCell className="py-3 px-4">
-                          <Badge
-                            variant={moderator.is_active !== false ? "success" : "destructive"}
-                            className="text-xs"
-                          >
-                            {moderator.is_active !== false ? "Active" : "Inactive"}
+                          <Badge variant={getStatusBadgeVariant(moderator)} className="text-xs">
+                            {getStatusText(moderator)}
                           </Badge>
                         </TableCell>
-                        <TableCell className="py-3 px-4 text-right">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openPermissionsDialog(moderator)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
+                        <TableCell className="py-3 px-4">
+                          <p className="text-sm text-foreground">
+                            {moderator.created_at ? format(new Date(moderator.created_at), "MMM dd, yyyy") : "N/A"}
+                          </p>
                         </TableCell>
+                        {canManageUsers && (
+                          <TableCell className="py-3 px-4 text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem className="cursor-pointer" onClick={() => handleViewUser(moderator)}>
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  View
+                                </DropdownMenuItem>
+                                <DropdownMenuItem className="cursor-pointer" onClick={() => handleEditUser(moderator)}>
+                                  <Edit2 className="h-4 w-4 mr-2" />
+                                  Edit
+                                </DropdownMenuItem>
+                                {moderator.is_suspended || !moderator.is_active ? (
+                                  <DropdownMenuItem className="cursor-pointer" onClick={() => handleReinstateUser(moderator)}>
+                                    <Unlock className="h-4 w-4 mr-2" />
+                                    Reinstate
+                                  </DropdownMenuItem>
+                                ) : (
+                                  <DropdownMenuItem className="cursor-pointer" onClick={() => setSuspendUserId(moderator.id || moderator.user_id)}>
+                                    <Ban className="h-4 w-4 mr-2" />
+                                    Suspend
+                                  </DropdownMenuItem>
+                                )}
+                                <DropdownMenuItem className="cursor-pointer" onClick={() => setResetPasswordUserId(moderator.id || moderator.user_id)}>
+                                  <KeyRound className="h-4 w-4 mr-2" />
+                                  Reset Password
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="text-destructive cursor-pointer focus:text-destructive"
+                                  onClick={() => setDeleteUserId(moderator.id || moderator.user_id)}
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        )}
                       </TableRow>
                     ))}
                   </TableBody>
@@ -587,14 +790,14 @@ function RolesAndPermissions() {
                       <Input id="email" type="email" value={editUser.email || ""} disabled />
                     </div>
                   </div>
-                  <div className="flex items-center justify-between">
+                  {/* <div className="flex items-center justify-between">
                     <Label htmlFor="is-active">Active</Label>
                     <Switch
                       id="is-active"
                       checked={!!editUser.is_active}
                       onCheckedChange={(checked) => setEditUser({ ...editUser, is_active: checked })}
                     />
-                  </div>
+                  </div> */}
                   <div className="flex items-center justify-between">
                     <Label htmlFor="is-verified">Verified</Label>
                     <Switch
@@ -811,14 +1014,28 @@ function RolesAndPermissions() {
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="create-password">Password *</Label>
-                  <Input
-                    id="create-password"
-                    type="password"
-                    placeholder="Enter password"
-                    value={createUserForm.password}
-                    onChange={(e) => setCreateUserForm({ ...createUserForm, password: e.target.value })}
-                    required
-                  />
+                  <div className="relative">
+                    <Input
+                      id="create-password"
+                      type={showCreatePassword ? "text" : "password"}
+                      placeholder="Enter password"
+                      value={createUserForm.password}
+                      onChange={(e) => setCreateUserForm({ ...createUserForm, password: e.target.value })}
+                      required
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCreatePassword(!showCreatePassword)}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                    >
+                      {showCreatePassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
               <div className="grid gap-4 md:grid-cols-2">
@@ -899,6 +1116,261 @@ function RolesAndPermissions() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* View User Details Dialog */}
+        {canManageUsers && (
+          <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>User Details</DialogTitle>
+              </DialogHeader>
+              {viewLoading ? (
+                <div className="space-y-4 py-8">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <Skeleton key={i} className="h-12 w-full" />
+                  ))}
+                </div>
+              ) : viewUser ? (
+                <div className="space-y-6 py-4">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="grid gap-2">
+                      <Label className="text-muted-foreground">Username</Label>
+                      <p className="text-sm font-medium">{viewUser.username || "N/A"}</p>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label className="text-muted-foreground">Email</Label>
+                      <p className="text-sm font-medium">{viewUser.email || "N/A"}</p>
+                    </div>
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="grid gap-2">
+                      <Label className="text-muted-foreground">First Name</Label>
+                      <p className="text-sm font-medium">{viewUser.first_name || "N/A"}</p>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label className="text-muted-foreground">Last Name</Label>
+                      <p className="text-sm font-medium">{viewUser.last_name || "N/A"}</p>
+                    </div>
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="grid gap-2">
+                      <Label className="text-muted-foreground">Phone</Label>
+                      <p className="text-sm font-medium">{viewUser.phone || "N/A"}</p>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label className="text-muted-foreground">Listings Count</Label>
+                      <p className="text-sm font-medium">{viewUser.listings_count || 0}</p>
+                    </div>
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="grid gap-2">
+                      <Label className="text-muted-foreground">Status</Label>
+                      <Badge variant={getStatusBadgeVariant(viewUser)} className="text-xs w-fit">
+                        {getStatusText(viewUser)}
+                      </Badge>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label className="text-muted-foreground">Verified</Label>
+                      <Badge variant={viewUser.is_verified ? "success" : "destructive"} className="text-xs w-fit">
+                        {viewUser.is_verified ? "Verified" : "Unverified"}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="grid gap-2">
+                      <Label className="text-muted-foreground">Joined Date</Label>
+                      <p className="text-sm font-medium">
+                        {viewUser.created_at ? format(new Date(viewUser.created_at), "MMM dd, yyyy HH:mm") : "N/A"}
+                      </p>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label className="text-muted-foreground">Last Updated</Label>
+                      <p className="text-sm font-medium">
+                        {viewUser.updated_at ? format(new Date(viewUser.updated_at), "MMM dd, yyyy HH:mm") : "N/A"}
+                      </p>
+                    </div>
+                  </div>
+                  {viewUser.bio && (
+                    <div className="grid gap-2">
+                      <Label className="text-muted-foreground">Bio</Label>
+                      <p className="text-sm">{viewUser.bio}</p>
+                    </div>
+                  )}
+                  <div className="flex justify-end gap-2 pt-4 border-t border-border">
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsViewDialogOpen(false)}
+                    >
+                      Close
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setIsViewDialogOpen(false);
+                        handleEditUser(viewUser);
+                      }}
+                      className="gradient-driptyard-hover text-white"
+                    >
+                      <Edit2 className="h-4 w-4 mr-2" />
+                      Edit User
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground py-4">No user data available</p>
+              )}
+            </DialogContent>
+          </Dialog>
+        )}
+
+        {/* Delete Confirmation Dialog */}
+        {canManageUsers && (
+          <AlertDialog open={!!deleteUserId} onOpenChange={() => setDeleteUserId(null)}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Permanently Delete User?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will permanently delete this user and all associated data including their listings. This action cannot be undone. The deletion will be recorded in the system logs for auditing purposes.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleDeleteUser}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Delete Permanently
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
+
+        {/* Suspend Confirmation Dialog */}
+        {canManageUsers && (
+          <AlertDialog open={!!suspendUserId} onOpenChange={() => setSuspendUserId(null)}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Suspend User?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will suspend the user's account. They will be notified via email and will not be able to access their account until reinstated.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleSuspendUser}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Suspend
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
+
+        {/* Reset Password Dialog */}
+        {canManageUsers && (
+          <Dialog open={!!resetPasswordUserId} onOpenChange={(open) => {
+            if (!open) {
+              setResetPasswordUserId(null);
+              setNewPassword("");
+              setConfirmPassword("");
+              setShowPassword(false);
+              setShowConfirmPassword(false);
+            }
+          }}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Reset User Password</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="new-password">New Password</Label>
+                  <div className="relative">
+                    <Input
+                      id="new-password"
+                      type={showPassword ? "text" : "password"}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Enter new password"
+                      disabled={resetPasswordLoading}
+                      className="pr-10"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                      onClick={() => setShowPassword(!showPassword)}
+                      disabled={resetPasswordLoading}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4 text-muted-foreground" />
+                      ) : (
+                        <Eye className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Password must be at least 6 characters long</p>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="confirm-password">Confirm Password</Label>
+                  <div className="relative">
+                    <Input
+                      id="confirm-password"
+                      type={showConfirmPassword ? "text" : "password"}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Confirm new password"
+                      disabled={resetPasswordLoading}
+                      className="pr-10"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      disabled={resetPasswordLoading}
+                    >
+                      {showConfirmPassword ? (
+                        <EyeOff className="h-4 w-4 text-muted-foreground" />
+                      ) : (
+                        <Eye className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </Button>
+                  </div>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  The user will receive an email notification with their new password.
+                </p>
+              </div>
+              <div className="flex justify-end gap-2 pt-4 border-t border-border">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setResetPasswordUserId(null);
+                    setNewPassword("");
+                    setConfirmPassword("");
+                    setShowPassword(false);
+                    setShowConfirmPassword(false);
+                  }}
+                  disabled={resetPasswordLoading}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleResetPassword}
+                  className="gradient-driptyard-hover text-white"
+                  disabled={resetPasswordLoading || !newPassword || !confirmPassword}
+                >
+                  {resetPasswordLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Reset Password
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
     </AdminLayout>
   );

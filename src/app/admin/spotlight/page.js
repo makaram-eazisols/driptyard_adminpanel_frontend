@@ -327,7 +327,7 @@ function Spotlight() {
                 </TableBody>
               </Table>
               {totalPages > 1 && (
-                <div className="flex justify-end mt-4 p-4 border-t border-border">
+                <div className="flex justify-end mt-8">
                   <div className="inline-flex items-center divide-x divide-border rounded-xl border border-border bg-background shadow-sm">
                     <div className="px-4 py-2 text-sm font-medium">
                       <span className="text-primary">

@@ -369,6 +369,12 @@ class ApiClient {
     return response.data;
   }
 
+  // ============ ADMIN LOGS ENDPOINTS ============
+  async getAdminLogs(params) {
+    const response = await this.client.get("/admin/logs", { params });
+    return response.data;
+  }
+
   // ============ MODERATORS ENDPOINTS ============
   async getModerators(params) {
     const response = await this.client.get("/moderators", { params });

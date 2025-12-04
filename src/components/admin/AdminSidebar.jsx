@@ -11,6 +11,7 @@ import {
   Star,
   ChevronRight,
   Shield,
+  FileText,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { cn } from "@/lib/utils";
@@ -75,6 +76,11 @@ const buildMenuItems = (user) => {
 
   if (can("can_see_flagged_content")) {
     items.push({ title: "Flagged Content", url: "/admin/flagged", icon: Flag });
+  }
+
+  // Logs & Audit Trails - typically admin only
+  if (isAdmin || user?.role === "admin") {
+    items.push({ title: "Logs & Audit Trails", url: "/admin/logs", icon: FileText });
   }
 
   return items;
