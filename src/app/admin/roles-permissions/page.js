@@ -28,7 +28,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Edit, ChevronLeft, ChevronRight, Loader2, Plus, Filter, X, Eye, Ban, Unlock, KeyRound, Trash2, MoreVertical, EyeOff, Edit2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -81,6 +80,11 @@ function RolesAndPermissions() {
   const [showCreatePassword, setShowCreatePassword] = useState(false);
   const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
   const [deleteUserId, setDeleteUserId] = useState(null);
+  const [selectedModerators, setSelectedModerators] = useState(new Set());
+  const [bulkDeleteDialog, setBulkDeleteDialog] = useState(false);
+  const [bulkStatusDialog, setBulkStatusDialog] = useState(false);
+  const [bulkStatusValue, setBulkStatusValue] = useState("active");
+  const [bulkActionLoading, setBulkActionLoading] = useState(false);
 
   // Fetch moderators
   const fetchModerators = async () => {
@@ -138,6 +142,8 @@ function RolesAndPermissions() {
 
   useEffect(() => {
     fetchModerators();
+    // Clear selection when filters change
+    setSelectedModerators(new Set());
   }, [currentPage, searchQuery, status]);
 
   const openPermissionsDialog = async (moderator) => {
@@ -192,6 +198,15 @@ function RolesAndPermissions() {
 
   const handleSaveUser = async () => {
     if (!editUser) return;
+
+    // Username validation (only letters, numbers, underscores, and hyphens)
+    if (editUser.username) {
+      const usernameRegex = /^[a-zA-Z0-9_-]+$/;
+      if (!usernameRegex.test(editUser.username)) {
+        notifyError("Username can only contain letters, numbers, underscores, and hyphens");
+        return;
+      }
+    }
 
     try {
       setEditLoading(true);
@@ -261,7 +276,7 @@ function RolesAndPermissions() {
       username: "",
       phone: "",
       country_code: "",
-      role: "",
+      role: "moderator", // Default to moderator
     });
     setPhoneValue("");
   };
@@ -301,13 +316,6 @@ function RolesAndPermissions() {
         country_code: "",
       }));
     }
-  };
-
-  const handleRoleChange = (value) => {
-    setCreateUserForm((prev) => ({
-      ...prev,
-      role: value,
-    }));
   };
 
   // Check manage users permission
@@ -439,9 +447,71 @@ function RolesAndPermissions() {
     return "Active";
   };
 
+  // Bulk selection handlers
+  const handleSelectAll = (checked) => {
+    if (checked) {
+      setSelectedModerators(new Set(moderators.map((m) => m.id || m.user_id)));
+    } else {
+      setSelectedModerators(new Set());
+    }
+  };
+
+  const handleSelectModerator = (moderatorId, checked) => {
+    const newSelected = new Set(selectedModerators);
+    if (checked) {
+      newSelected.add(moderatorId);
+    } else {
+      newSelected.delete(moderatorId);
+    }
+    setSelectedModerators(newSelected);
+  };
+
+  const isAllSelected = moderators.length > 0 && selectedModerators.size === moderators.length;
+  const isIndeterminate = selectedModerators.size > 0 && selectedModerators.size < moderators.length;
+
+  // Bulk action handlers
+  const handleBulkDelete = async () => {
+    if (selectedModerators.size === 0) return;
+
+    setBulkActionLoading(true);
+    try {
+      const moderatorIds = Array.from(selectedModerators).map(id => parseInt(id, 10));
+      const response = await apiClient.bulkDeleteUsers(moderatorIds);
+      notifySuccess(response.message || `${selectedModerators.size} moderator(s) deleted successfully`);
+      setSelectedModerators(new Set());
+      setBulkDeleteDialog(false);
+      fetchModerators();
+    } catch (error) {
+      console.error("Failed to delete moderators:", error);
+      notifyError(error.response?.data?.detail || "Failed to delete moderators");
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
+  const handleBulkStatusChange = async () => {
+    if (selectedModerators.size === 0) return;
+
+    setBulkActionLoading(true);
+    try {
+      const moderatorIds = Array.from(selectedModerators).map(id => parseInt(id, 10));
+      const isActive = bulkStatusValue === "active";
+      const response = await apiClient.bulkUpdateUserStatus(moderatorIds, isActive);
+      notifySuccess(response.message || `${selectedModerators.size} moderator(s) status updated successfully`);
+      setSelectedModerators(new Set());
+      setBulkStatusDialog(false);
+      fetchModerators();
+    } catch (error) {
+      console.error("Failed to update moderator status:", error);
+      notifyError(error.response?.data?.detail || "Failed to update moderator status");
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
   const handleCreateUser = async () => {
     // Validation
-    if (!createUserForm.email || !createUserForm.password || !createUserForm.username || !phoneValue || !createUserForm.role) {
+    if (!createUserForm.email || !createUserForm.password || !createUserForm.username || !phoneValue) {
       notifyError("Please fill in all required fields");
       return;
     }
@@ -453,9 +523,32 @@ function RolesAndPermissions() {
       return;
     }
 
-    // Password validation (minimum 6 characters)
-    if (createUserForm.password.length < 6) {
-      notifyError("Password must be at least 6 characters long");
+    // Username validation (only letters, numbers, underscores, and hyphens)
+    const usernameRegex = /^[a-zA-Z0-9_-]+$/;
+    if (!usernameRegex.test(createUserForm.username)) {
+      notifyError("Username can only contain letters, numbers, underscores, and hyphens");
+      return;
+    }
+
+    // Standard password validation
+    if (createUserForm.password.length < 8) {
+      notifyError("Password must be at least 8 characters long");
+      return;
+    }
+    if (!/[A-Z]/.test(createUserForm.password)) {
+      notifyError("Password must contain at least one uppercase letter");
+      return;
+    }
+    if (!/[a-z]/.test(createUserForm.password)) {
+      notifyError("Password must contain at least one lowercase letter");
+      return;
+    }
+    if (!/[0-9]/.test(createUserForm.password)) {
+      notifyError("Password must contain at least one number");
+      return;
+    }
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(createUserForm.password)) {
+      notifyError("Password must contain at least one special character");
       return;
     }
 
@@ -470,9 +563,9 @@ function RolesAndPermissions() {
         username: createUserForm.username,
         phone: phoneValue,
         country_code: countryCode || createUserForm.country_code,
-        is_admin: createUserForm.role === "admin",
-        is_moderator: createUserForm.role === "moderator",
-        is_customer: createUserForm.role === "customer",
+        is_admin: false,
+        is_moderator: true, // Always moderator for this page
+        is_customer: false,
       };
 
       await apiClient.createAdminUser(payload);
@@ -484,7 +577,7 @@ function RolesAndPermissions() {
         username: "",
         phone: "",
         country_code: "",
-        role: "",
+        role: "moderator",
       });
       setPhoneValue("");
       fetchModerators();
@@ -587,10 +680,57 @@ function RolesAndPermissions() {
             </div>
           ) : (
             <>
+              {/* Bulk Action Toolbar */}
+              {canManageUsers && selectedModerators.size > 0 && (
+                <div className="flex items-center justify-between rounded-lg border border-border bg-muted/50 p-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-primary">
+                      {selectedModerators.size} moderator(s) selected
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setBulkStatusDialog(true)}
+                      disabled={bulkActionLoading}
+                    >
+                      Change Status
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => setBulkDeleteDialog(true)}
+                      disabled={bulkActionLoading}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedModerators(new Set())}
+                      disabled={bulkActionLoading}
+                    >
+                      <X className="h-4 w-4 mr-2" />
+                      Clear Selection
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               <div className="rounded-lg border border-border overflow-hidden">
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/50 hover:bg-muted/50">
+                      {canManageUsers && (
+                        <TableHead className="h-12 px-4 w-12">
+                          <Checkbox
+                            checked={isAllSelected}
+                            onCheckedChange={handleSelectAll}
+                          />
+                        </TableHead>
+                      )}
                       <TableHead className="h-12 px-4 font-semibold text-secondary">Name</TableHead>
                       <TableHead className="h-12 px-4 font-semibold text-secondary">Email</TableHead>
                       {/* <TableHead className="h-12 px-4 font-semibold text-secondary">Role</TableHead> */}
@@ -609,6 +749,14 @@ function RolesAndPermissions() {
                         key={moderator.id || moderator.user_id}
                         className="hover:bg-muted/30 transition-colors"
                       >
+                        {canManageUsers && (
+                          <TableCell className="py-3 px-4">
+                            <Checkbox
+                              checked={selectedModerators.has(moderator.id || moderator.user_id)}
+                              onCheckedChange={(checked) => handleSelectModerator(moderator.id || moderator.user_id, checked)}
+                            />
+                          </TableCell>
+                        )}
                         <TableCell className="py-3 px-4">
                           <p className="font-semibold text-sm text-primary leading-tight">
                             {moderator.username ||
@@ -784,6 +932,7 @@ function RolesAndPermissions() {
                         value={editUser.username || ""}
                         onChange={(e) => setEditUser({ ...editUser, username: e.target.value })}
                       />
+                      <p className="text-xs text-muted-foreground">Only letters, numbers, underscores, and hyphens are allowed</p>
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="email">Email</Label>
@@ -996,13 +1145,13 @@ function RolesAndPermissions() {
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" onOpenAutoFocus={(e) => e.preventDefault()}>
             <DialogHeader>
-              <DialogTitle>Create New User</DialogTitle>
-              <DialogDescription>Add a new user to the system with the required information</DialogDescription>
+              <DialogTitle>Create New Moderator</DialogTitle>
+              <DialogDescription>Add a new moderator to the system with the required information</DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="grid gap-4 md:grid-cols-2">
-                <div className="grid gap-2">
-                  <Label htmlFor="create-email">Email *</Label>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="create-email" className="h-5">Email *</Label>
                   <Input
                     id="create-email"
                     type="email"
@@ -1010,10 +1159,37 @@ function RolesAndPermissions() {
                     value={createUserForm.email}
                     onChange={(e) => setCreateUserForm({ ...createUserForm, email: e.target.value })}
                     required
+                    className="h-10"
                   />
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="create-password">Password *</Label>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="create-phone" className="h-5">Phone Number *</Label>
+                  <div className="h-10 [&_.PhoneInputInput]:flex [&_.PhoneInputInput]:h-10 [&_.PhoneInputInput]:w-full [&_.PhoneInputInput]:rounded-md [&_.PhoneInputInput]:border [&_.PhoneInputInput]:border-input [&_.PhoneInputInput]:bg-background [&_.PhoneInputInput]:px-3 [&_.PhoneInputInput]:py-2 [&_.PhoneInputInput]:text-sm [&_.PhoneInputInput]:ring-offset-background [&_.PhoneInputInput]:focus-visible:outline-none [&_.PhoneInputInput]:focus-visible:ring-2 [&_.PhoneInputInput]:focus-visible:ring-ring [&_.PhoneInputInput]:focus-visible:ring-offset-2 [&_.PhoneInputInput]:disabled:cursor-not-allowed [&_.PhoneInputInput]:disabled:opacity-50 [&_.PhoneInputCountry]:mr-2 [&_.PhoneInputCountry]:flex [&_.PhoneInputCountry]:items-center">
+                    <PhoneInput
+                      international
+                      defaultCountry="US"
+                      value={phoneValue}
+                      onChange={handlePhoneChange}
+                      placeholder="Enter phone number"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="create-username" className="h-5">Username *</Label>
+                  <Input
+                    id="create-username"
+                    placeholder="Enter username"
+                    value={createUserForm.username}
+                    onChange={(e) => setCreateUserForm({ ...createUserForm, username: e.target.value })}
+                    required
+                    className="h-10"
+                  />
+                  <p className="text-xs text-muted-foreground h-4">Only letters, numbers, underscores, and hyphens are allowed</p>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="create-password" className="h-5">Password *</Label>
                   <div className="relative">
                     <Input
                       id="create-password"
@@ -1022,7 +1198,7 @@ function RolesAndPermissions() {
                       value={createUserForm.password}
                       onChange={(e) => setCreateUserForm({ ...createUserForm, password: e.target.value })}
                       required
-                      className="pr-10"
+                      className="pr-10 h-10"
                     />
                     <button
                       type="button"
@@ -1036,58 +1212,8 @@ function RolesAndPermissions() {
                       )}
                     </button>
                   </div>
+                  <p className="text-xs text-muted-foreground h-4">Must be at least 8 characters with uppercase, lowercase, number, and special character</p>
                 </div>
-              </div>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="grid gap-2">
-                  <Label htmlFor="create-username">Username *</Label>
-                  <Input
-                    id="create-username"
-                    placeholder="Enter username"
-                    value={createUserForm.username}
-                    onChange={(e) => setCreateUserForm({ ...createUserForm, username: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="create-phone">Phone Number *</Label>
-                  <div className="[&_.PhoneInputInput]:flex [&_.PhoneInputInput]:h-10 [&_.PhoneInputInput]:w-full [&_.PhoneInputInput]:rounded-md [&_.PhoneInputInput]:border [&_.PhoneInputInput]:border-input [&_.PhoneInputInput]:bg-background [&_.PhoneInputInput]:px-3 [&_.PhoneInputInput]:py-2 [&_.PhoneInputInput]:text-sm [&_.PhoneInputInput]:ring-offset-background [&_.PhoneInputInput]:focus-visible:outline-none [&_.PhoneInputInput]:focus-visible:ring-2 [&_.PhoneInputInput]:focus-visible:ring-ring [&_.PhoneInputInput]:focus-visible:ring-offset-2 [&_.PhoneInputInput]:disabled:cursor-not-allowed [&_.PhoneInputInput]:disabled:opacity-50 [&_.PhoneInputCountry]:mr-2">
-                    <PhoneInput
-                      international
-                      defaultCountry="US"
-                      value={phoneValue}
-                      onChange={handlePhoneChange}
-                      placeholder="Enter phone number"
-                    />
-                  </div>
-                </div>
-              </div>
-              <div className="grid gap-2">
-                <Label>Role *</Label>
-                <RadioGroup
-                  value={createUserForm.role}
-                  onValueChange={handleRoleChange}
-                  className="flex flex-col space-y-2"
-                >
-                  {/* <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="admin" id="role-admin" />
-                    <Label htmlFor="role-admin" className="font-normal cursor-pointer">
-                      Admin
-                    </Label>
-                  </div> */}
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="moderator" id="role-moderator" />
-                    <Label htmlFor="role-moderator" className="font-normal cursor-pointer">
-                      Moderator
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="customer" id="role-customer" />
-                    <Label htmlFor="role-customer" className="font-normal cursor-pointer">
-                      Customer
-                    </Label>
-                  </div>
-                </RadioGroup>
               </div>
               <div className="flex justify-end gap-2 pt-4">
                 <Button
@@ -1100,7 +1226,7 @@ function RolesAndPermissions() {
                       username: "",
                       phone: "",
                       country_code: "",
-                      role: "",
+                      role: "moderator",
                     });
                     setPhoneValue("");
                   }}
@@ -1366,6 +1492,73 @@ function RolesAndPermissions() {
                 >
                   {resetPasswordLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                   Reset Password
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
+
+        {/* Bulk Delete Dialog */}
+        {canManageUsers && (
+          <AlertDialog open={bulkDeleteDialog} onOpenChange={setBulkDeleteDialog}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete {selectedModerators.size} Moderator(s)?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will permanently delete {selectedModerators.size} selected moderator(s) and all associated data. This action cannot be undone. The deletion will be recorded in the system logs for auditing purposes.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={bulkActionLoading}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleBulkDelete}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  disabled={bulkActionLoading}
+                >
+                  {bulkActionLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Delete Permanently
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
+
+        {/* Bulk Status Change Dialog */}
+        {canManageUsers && (
+          <Dialog open={bulkStatusDialog} onOpenChange={setBulkStatusDialog}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Change Status for {selectedModerators.size} Moderator(s)</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="grid gap-2">
+                  <Label>New Status</Label>
+                  <Select value={bulkStatusValue} onValueChange={setBulkStatusValue}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 pt-4 border-t border-border">
+                <Button
+                  variant="outline"
+                  onClick={() => setBulkStatusDialog(false)}
+                  disabled={bulkActionLoading}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleBulkStatusChange}
+                  className="gradient-driptyard-hover text-white"
+                  disabled={bulkActionLoading}
+                >
+                  {bulkActionLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Update Status
                 </Button>
               </div>
             </DialogContent>

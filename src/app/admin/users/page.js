@@ -5,7 +5,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Edit2, Trash2, Loader2, MoreVertical, ChevronLeft, ChevronRight, Filter, X, Eye, Ban, Unlock, KeyRound, EyeOff } from "lucide-react";
+import { Search, Edit2, Trash2, Loader2, MoreVertical, ChevronLeft, ChevronRight, Filter, X, Eye, Ban, Unlock, KeyRound, EyeOff, Plus } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -15,7 +15,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,6 +35,8 @@ import { apiClient } from "@/lib/api-client";
 import { notifyError, notifySuccess } from "@/lib/toast";
 import { format } from "date-fns";
 import { useAuth } from "@/hooks/use-auth";
+import PhoneInput from "react-phone-number-input";
+import "react-phone-number-input/style.css";
 
 function Users() {
   const { user } = useAuth();
@@ -65,12 +67,31 @@ function Users() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [createUserForm, setCreateUserForm] = useState({
+    email: "",
+    password: "",
+    username: "",
+    phone: "",
+    country_code: "",
+    role: "customer", // Default to customer
+  });
+  const [createLoading, setCreateLoading] = useState(false);
+  const [phoneValue, setPhoneValue] = useState("");
+  const [showCreatePassword, setShowCreatePassword] = useState(false);
+  const [selectedUsers, setSelectedUsers] = useState(new Set());
+  const [bulkDeleteDialog, setBulkDeleteDialog] = useState(false);
+  const [bulkStatusDialog, setBulkStatusDialog] = useState(false);
+  const [bulkStatusValue, setBulkStatusValue] = useState("active");
+  const [bulkActionLoading, setBulkActionLoading] = useState(false);
 
   // Check manage users permission
   const canManageUsers = user?.is_admin || user?.permissions?.can_manage_users === true;
 
   useEffect(() => {
     fetchUsers();
+    // Clear selection when filters change
+    setSelectedUsers(new Set());
   }, [currentPage, searchTerm, status]);
 
   const fetchUsers = async () => {
@@ -151,6 +172,15 @@ function Users() {
 
   const handleSaveUser = async () => {
     if (!editUser) return;
+
+    // Username validation (only letters, numbers, underscores, and hyphens)
+    if (editUser.username) {
+      const usernameRegex = /^[a-zA-Z0-9_-]+$/;
+      if (!usernameRegex.test(editUser.username)) {
+        notifyError("Username can only contain letters, numbers, underscores, and hyphens");
+        return;
+      }
+    }
 
     try {
       setEditLoading(true);
@@ -351,6 +381,185 @@ function Users() {
     handleViewUser(user);
   };
 
+  // Bulk selection handlers
+  const handleSelectAll = (checked) => {
+    if (checked) {
+      setSelectedUsers(new Set(users.map((u) => u.id)));
+    } else {
+      setSelectedUsers(new Set());
+    }
+  };
+
+  const handleSelectUser = (userId, checked) => {
+    const newSelected = new Set(selectedUsers);
+    if (checked) {
+      newSelected.add(userId);
+    } else {
+      newSelected.delete(userId);
+    }
+    setSelectedUsers(newSelected);
+  };
+
+  const isAllSelected = users.length > 0 && selectedUsers.size === users.length;
+  const isIndeterminate = selectedUsers.size > 0 && selectedUsers.size < users.length;
+
+  // Bulk action handlers
+  const handleBulkDelete = async () => {
+    if (selectedUsers.size === 0) return;
+
+    setBulkActionLoading(true);
+    try {
+      const userIds = Array.from(selectedUsers).map(id => parseInt(id, 10));
+      const response = await apiClient.bulkDeleteUsers(userIds);
+      notifySuccess(response.message || `${selectedUsers.size} user(s) deleted successfully`);
+      setSelectedUsers(new Set());
+      setBulkDeleteDialog(false);
+      fetchUsers();
+    } catch (error) {
+      console.error("Failed to delete users:", error);
+      notifyError(error.response?.data?.detail || "Failed to delete users");
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
+  const handleBulkStatusChange = async () => {
+    if (selectedUsers.size === 0) return;
+
+    setBulkActionLoading(true);
+    try {
+      const userIds = Array.from(selectedUsers).map(id => parseInt(id, 10));
+      const isActive = bulkStatusValue === "active";
+      const response = await apiClient.bulkUpdateUserStatus(userIds, isActive);
+      notifySuccess(response.message || `${selectedUsers.size} user(s) status updated successfully`);
+      setSelectedUsers(new Set());
+      setBulkStatusDialog(false);
+      fetchUsers();
+    } catch (error) {
+      console.error("Failed to update user status:", error);
+      notifyError(error.response?.data?.detail || "Failed to update user status");
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
+  const handlePhoneChange = (value) => {
+    setPhoneValue(value || "");
+    if (value) {
+      try {
+        // Extract country code from phone value (format: +1234567890 or +1 234567890)
+        let extractedCountryCode = "";
+        let phoneNumber = value;
+        
+        // Remove spaces and extract country code
+        const cleanValue = value.replace(/\s/g, "");
+        const match = cleanValue.match(/^\+(\d{1,3})/);
+        if (match) {
+          extractedCountryCode = match[1];
+          // Remove country code from phone number
+          phoneNumber = cleanValue.substring(match[0].length);
+        }
+
+        setCreateUserForm((prev) => ({
+          ...prev,
+          phone: phoneNumber || value,
+          country_code: extractedCountryCode,
+        }));
+      } catch (error) {
+        setCreateUserForm((prev) => ({
+          ...prev,
+          phone: value || "",
+        }));
+      }
+    } else {
+      setCreateUserForm((prev) => ({
+        ...prev,
+        phone: "",
+        country_code: "",
+      }));
+    }
+  };
+
+  const handleCreateUser = async () => {
+    // Validation
+    if (!createUserForm.email || !createUserForm.password || !createUserForm.username || !phoneValue) {
+      notifyError("Please fill in all required fields");
+      return;
+    }
+
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(createUserForm.email)) {
+      notifyError("Please enter a valid email address");
+      return;
+    }
+
+    // Username validation (only letters, numbers, underscores, and hyphens)
+    const usernameRegex = /^[a-zA-Z0-9_-]+$/;
+    if (!usernameRegex.test(createUserForm.username)) {
+      notifyError("Username can only contain letters, numbers, underscores, and hyphens");
+      return;
+    }
+
+    // Standard password validation
+    if (createUserForm.password.length < 8) {
+      notifyError("Password must be at least 8 characters long");
+      return;
+    }
+    if (!/[A-Z]/.test(createUserForm.password)) {
+      notifyError("Password must contain at least one uppercase letter");
+      return;
+    }
+    if (!/[a-z]/.test(createUserForm.password)) {
+      notifyError("Password must contain at least one lowercase letter");
+      return;
+    }
+    if (!/[0-9]/.test(createUserForm.password)) {
+      notifyError("Password must contain at least one number");
+      return;
+    }
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(createUserForm.password)) {
+      notifyError("Password must contain at least one special character");
+      return;
+    }
+
+    // Use country code from form state (already extracted in handlePhoneChange)
+    const countryCode = createUserForm.country_code;
+
+    setCreateLoading(true);
+    try {
+      const payload = {
+        email: createUserForm.email,
+        password: createUserForm.password,
+        username: createUserForm.username,
+        phone: phoneValue,
+        country_code: countryCode || createUserForm.country_code,
+        is_admin: false,
+        is_moderator: false,
+        is_customer: true, // Always customer for this page
+      };
+
+      await apiClient.createAdminUser(payload);
+      notifySuccess("User created successfully");
+      setIsCreateDialogOpen(false);
+      setCreateUserForm({
+        email: "",
+        password: "",
+        username: "",
+        phone: "",
+        country_code: "",
+        role: "customer",
+      });
+      setPhoneValue("");
+      fetchUsers();
+    } catch (error) {
+      console.error("Failed to create user:", error);
+      notifyError(error.response?.data?.detail || "Failed to create user");
+    } finally {
+      setCreateLoading(false);
+    }
+  };
+
   return (
     <AdminLayout>
       <div className="space-y-6">
@@ -377,6 +586,15 @@ function Users() {
               <Button variant="ghost" size="sm" onClick={handleClearFilters}>
                 <X className="h-4 w-4 mr-2" />
                 Clear
+              </Button>
+            )}
+            {canManageUsers && (
+              <Button
+                onClick={() => setIsCreateDialogOpen(true)}
+                className="gradient-driptyard-hover text-white"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add User
               </Button>
             )}
           </div>
@@ -432,10 +650,58 @@ function Users() {
             </div>
           ) : (
             <>
+              {/* Bulk Action Toolbar */}
+              {canManageUsers && selectedUsers.size > 0 && (
+                <div className="flex items-center justify-between rounded-lg border border-border bg-muted/50 p-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-primary">
+                      {selectedUsers.size} user(s) selected
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setBulkStatusDialog(true)}
+                      disabled={bulkActionLoading}
+                    >
+                      Change Status
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => setBulkDeleteDialog(true)}
+                      disabled={bulkActionLoading}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedUsers(new Set())}
+                      disabled={bulkActionLoading}
+                    >
+                      <X className="h-4 w-4 mr-2" />
+                      Clear Selection
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               <div className="rounded-lg border border-border overflow-hidden">
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/50 hover:bg-muted/50">
+                      {canManageUsers && (
+                        <TableHead className="h-12 px-4 w-12">
+                          <Checkbox
+                            checked={isAllSelected}
+                            onCheckedChange={handleSelectAll}
+                            className={isIndeterminate ? "data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground" : ""}
+                          />
+                        </TableHead>
+                      )}
                       <TableHead className="h-12 px-4 font-semibold text-secondary">User Name</TableHead>
                       <TableHead className="h-12 px-4 font-semibold text-secondary">Email</TableHead>
                       <TableHead className="h-12 px-4 font-semibold text-secondary">Listings</TableHead>
@@ -449,6 +715,14 @@ function Users() {
                   <TableBody>
                     {users?.map((user) => (
                       <TableRow key={user.id} className="hover:bg-muted/30 transition-colors">
+                        {canManageUsers && (
+                          <TableCell className="py-3 px-4">
+                            <Checkbox
+                              checked={selectedUsers.has(user.id)}
+                              onCheckedChange={(checked) => handleSelectUser(user.id, checked)}
+                            />
+                          </TableCell>
+                        )}
                         <TableCell className="py-3 px-4">
                           <p 
                             className="font-semibold text-sm text-primary leading-tight cursor-pointer hover:text-accent transition-colors"
@@ -606,6 +880,7 @@ function Users() {
                       value={editUser.username || ""}
                       onChange={(e) => setEditUser({ ...editUser, username: e.target.value })}
                     />
+                    <p className="text-xs text-muted-foreground">Only letters, numbers, underscores, and hyphens are allowed</p>
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="email">Email</Label>
@@ -967,6 +1242,110 @@ function Users() {
       )}
 
 
+      {/* Create User Dialog */}
+      {canManageUsers && (
+        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" onOpenAutoFocus={(e) => e.preventDefault()}>
+            <DialogHeader>
+              <DialogTitle>Create New Customer</DialogTitle>
+              <DialogDescription>Add a new customer to the system with the required information</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="create-email" className="h-5">Email *</Label>
+                  <Input
+                    id="create-email"
+                    type="email"
+                    placeholder="user@example.com"
+                    value={createUserForm.email}
+                    onChange={(e) => setCreateUserForm({ ...createUserForm, email: e.target.value })}
+                    required
+                    className="h-10"
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="create-phone" className="h-5">Phone Number *</Label>
+                  <div className="h-10 [&_.PhoneInputInput]:flex [&_.PhoneInputInput]:h-10 [&_.PhoneInputInput]:w-full [&_.PhoneInputInput]:rounded-md [&_.PhoneInputInput]:border [&_.PhoneInputInput]:border-input [&_.PhoneInputInput]:bg-background [&_.PhoneInputInput]:px-3 [&_.PhoneInputInput]:py-2 [&_.PhoneInputInput]:text-sm [&_.PhoneInputInput]:ring-offset-background [&_.PhoneInputInput]:focus-visible:outline-none [&_.PhoneInputInput]:focus-visible:ring-2 [&_.PhoneInputInput]:focus-visible:ring-ring [&_.PhoneInputInput]:focus-visible:ring-offset-2 [&_.PhoneInputInput]:disabled:cursor-not-allowed [&_.PhoneInputInput]:disabled:opacity-50 [&_.PhoneInputCountry]:mr-2 [&_.PhoneInputCountry]:flex [&_.PhoneInputCountry]:items-center">
+                    <PhoneInput
+                      international
+                      defaultCountry="US"
+                      value={phoneValue}
+                      onChange={handlePhoneChange}
+                      placeholder="Enter phone number"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="create-username" className="h-5">Username *</Label>
+                  <Input
+                    id="create-username"
+                    placeholder="Enter username"
+                    value={createUserForm.username}
+                    onChange={(e) => setCreateUserForm({ ...createUserForm, username: e.target.value })}
+                    required
+                    className="h-10"
+                  />
+                  <p className="text-xs text-muted-foreground h-4">Only letters, numbers, underscores, and hyphens are allowed</p>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="create-password" className="h-5">Password *</Label>
+                  <div className="relative">
+                    <Input
+                      id="create-password"
+                      type={showCreatePassword ? "text" : "password"}
+                      placeholder="Enter password"
+                      value={createUserForm.password}
+                      onChange={(e) => setCreateUserForm({ ...createUserForm, password: e.target.value })}
+                      required
+                      className="pr-10 h-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCreatePassword(!showCreatePassword)}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                    >
+                      {showCreatePassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
+                  <p className="text-xs text-muted-foreground h-4">Must be at least 8 characters with uppercase, lowercase, number, and special character</p>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsCreateDialogOpen(false);
+                    setCreateUserForm({
+                      email: "",
+                      password: "",
+                      username: "",
+                      phone: "",
+                      country_code: "",
+                      role: "customer",
+                    });
+                    setPhoneValue("");
+                  }}
+                  disabled={createLoading}
+                >
+                  Cancel
+                </Button>
+                <Button onClick={handleCreateUser} className="gradient-driptyard-hover text-white" disabled={createLoading}>
+                  {createLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Create User
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
       {/* View User Details Dialog */}
       {canManageUsers && (
         <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
@@ -1068,6 +1447,73 @@ function Users() {
             ) : (
               <p className="text-sm text-muted-foreground py-4">No user data available</p>
             )}
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Bulk Delete Dialog */}
+      {canManageUsers && (
+        <AlertDialog open={bulkDeleteDialog} onOpenChange={setBulkDeleteDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete {selectedUsers.size} User(s)?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently delete {selectedUsers.size} selected user(s) and all associated data including their listings. This action cannot be undone. The deletion will be recorded in the system logs for auditing purposes.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={bulkActionLoading}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleBulkDelete}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                disabled={bulkActionLoading}
+              >
+                {bulkActionLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Delete Permanently
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+
+      {/* Bulk Status Change Dialog */}
+      {canManageUsers && (
+        <Dialog open={bulkStatusDialog} onOpenChange={setBulkStatusDialog}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Change Status for {selectedUsers.size} User(s)</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="grid gap-2">
+                <Label>New Status</Label>
+                <Select value={bulkStatusValue} onValueChange={setBulkStatusValue}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-4 border-t border-border">
+              <Button
+                variant="outline"
+                onClick={() => setBulkStatusDialog(false)}
+                disabled={bulkActionLoading}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleBulkStatusChange}
+                className="gradient-driptyard-hover text-white"
+                disabled={bulkActionLoading}
+              >
+                {bulkActionLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Update Status
+              </Button>
+            </div>
           </DialogContent>
         </Dialog>
       )}

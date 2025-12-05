@@ -36,6 +36,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const CONDITIONS = [
   { value: "New", label: "New" },
@@ -66,6 +67,13 @@ function Products() {
   const [existingSpotlight, setExistingSpotlight] = useState(null);
   const [fetchingSpotlight, setFetchingSpotlight] = useState(false);
   const [removingSpotlight, setRemovingSpotlight] = useState(false);
+  const [selectedProducts, setSelectedProducts] = useState(new Set());
+  const [bulkDeleteDialog, setBulkDeleteDialog] = useState(false);
+  const [bulkStatusDialog, setBulkStatusDialog] = useState(false);
+  const [bulkVerificationDialog, setBulkVerificationDialog] = useState(false);
+  const [bulkStatusValue, setBulkStatusValue] = useState("active");
+  const [bulkVerificationValue, setBulkVerificationValue] = useState("verified");
+  const [bulkActionLoading, setBulkActionLoading] = useState(false);
 
   // Check spotlight permissions
   const canSpotlight = user?.is_admin || user?.permissions?.can_spotlight === true;
@@ -279,6 +287,94 @@ function Products() {
     return product.is_active ? "Active" : "Inactive";
   };
 
+  useEffect(() => {
+    fetchProducts();
+    // Clear selection when filters change
+    setSelectedProducts(new Set());
+  }, [page, searchQuery, status, verification]);
+
+  // Bulk selection handlers
+  const handleSelectAll = (checked) => {
+    if (checked) {
+      setSelectedProducts(new Set(products.map((p) => p.id)));
+    } else {
+      setSelectedProducts(new Set());
+    }
+  };
+
+  const handleSelectProduct = (productId, checked) => {
+    const newSelected = new Set(selectedProducts);
+    if (checked) {
+      newSelected.add(productId);
+    } else {
+      newSelected.delete(productId);
+    }
+    setSelectedProducts(newSelected);
+  };
+
+  const isAllSelected = products.length > 0 && selectedProducts.size === products.length;
+  const isIndeterminate = selectedProducts.size > 0 && selectedProducts.size < products.length;
+
+  // Bulk action handlers
+  const handleBulkDelete = async () => {
+    if (selectedProducts.size === 0) return;
+
+    setBulkActionLoading(true);
+    try {
+      const productIds = Array.from(selectedProducts).map(id => parseInt(id, 10));
+      const response = await apiClient.bulkDeleteProducts(productIds);
+      notifySuccess(response.message || `${selectedProducts.size} product(s) deleted successfully`);
+      setSelectedProducts(new Set());
+      setBulkDeleteDialog(false);
+      fetchProducts();
+    } catch (error) {
+      console.error("Failed to delete products:", error);
+      notifyError(error.response?.data?.detail || "Failed to delete products");
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
+  const handleBulkStatusChange = async () => {
+    if (selectedProducts.size === 0) return;
+
+    setBulkActionLoading(true);
+    try {
+      const productIds = Array.from(selectedProducts).map(id => parseInt(id, 10));
+      const isActive = bulkStatusValue === "active";
+      const response = await apiClient.bulkUpdateProductStatus(productIds, isActive);
+      notifySuccess(response.message || `${selectedProducts.size} product(s) status updated successfully`);
+      setSelectedProducts(new Set());
+      setBulkStatusDialog(false);
+      fetchProducts();
+    } catch (error) {
+      console.error("Failed to update product status:", error);
+      notifyError(error.response?.data?.detail || "Failed to update product status");
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
+  const handleBulkVerificationChange = async () => {
+    if (selectedProducts.size === 0) return;
+
+    setBulkActionLoading(true);
+    try {
+      const productIds = Array.from(selectedProducts).map(id => parseInt(id, 10));
+      const isVerified = bulkVerificationValue === "verified";
+      const response = await apiClient.bulkUpdateProductVerification(productIds, isVerified);
+      notifySuccess(response.message || `${selectedProducts.size} product(s) verification updated successfully`);
+      setSelectedProducts(new Set());
+      setBulkVerificationDialog(false);
+      fetchProducts();
+    } catch (error) {
+      console.error("Failed to update product verification:", error);
+      notifyError(error.response?.data?.detail || "Failed to update product verification");
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
 const getPrimaryImage = (product) => {
   if (Array.isArray(product.images) && product.images.length > 0) {
     return product.images[0];
@@ -421,10 +517,65 @@ const formatPrice = (value) => {
               </div>
             ) : (
               <>
+                {/* Bulk Action Toolbar */}
+                {canManageListings && selectedProducts.size > 0 && (
+                  <div className="flex items-center justify-between rounded-lg border border-border bg-muted/50 p-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-primary">
+                        {selectedProducts.size} product(s) selected
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setBulkStatusDialog(true)}
+                        disabled={bulkActionLoading}
+                      >
+                        Change Status
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setBulkVerificationDialog(true)}
+                        disabled={bulkActionLoading}
+                      >
+                        Change Verification
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => setBulkDeleteDialog(true)}
+                        disabled={bulkActionLoading}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSelectedProducts(new Set())}
+                        disabled={bulkActionLoading}
+                      >
+                        <X className="h-4 w-4 mr-2" />
+                        Clear Selection
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="rounded-lg border border-border overflow-hidden">
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-muted/50 hover:bg-muted/50">
+                        {canManageListings && (
+                          <TableHead className="h-12 px-4 w-12">
+                            <Checkbox
+                              checked={isAllSelected}
+                              onCheckedChange={handleSelectAll}
+                            />
+                          </TableHead>
+                        )}
                         <TableHead className="h-12 px-4 font-semibold text-secondary max-w-[100px]">Thumbnail</TableHead>
                         <TableHead className="h-12 px-4 font-semibold text-secondary max-w-[250px]">Title</TableHead>
                         <TableHead className="h-12 px-4 font-semibold text-secondary max-w-[150px]">Seller</TableHead>
@@ -443,6 +594,14 @@ const formatPrice = (value) => {
 
                         return (
                           <TableRow key={product.id} className="hover:bg-muted/30 transition-colors">
+                            {canManageListings && (
+                              <TableCell className="py-3 px-4">
+                                <Checkbox
+                                  checked={selectedProducts.has(product.id)}
+                                  onCheckedChange={(checked) => handleSelectProduct(product.id, checked)}
+                                />
+                              </TableCell>
+                            )}
                             <TableCell className="py-3 px-4 max-w-[100px]">
                               <div className="h-16 w-16 rounded-lg border border-border overflow-hidden bg-muted/50 shadow-sm">
                                 {image ? (
@@ -483,7 +642,7 @@ const formatPrice = (value) => {
                                       </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
-                                      {product.is_verified && canSpotlight && (
+                                      {product.is_verified && product.is_active && canSpotlight && (
                                         <DropdownMenuItem
                                           className="cursor-pointer group flex items-center gap-2 hover:bg-[#E0B74F] hover:text-[#0B0B0D] focus:bg-[#E0B74F] focus:text-[#0B0B0D] transition-colors"
                                           onClick={() => setSpotlightProduct(product)}
@@ -933,7 +1092,116 @@ const formatPrice = (value) => {
             </div>
           )}
         </DialogContent>
-      </Dialog>
+          </Dialog>
+
+      {/* Bulk Delete Dialog */}
+      {canManageListings && (
+        <AlertDialog open={bulkDeleteDialog} onOpenChange={setBulkDeleteDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete {selectedProducts.size} Product(s)?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently delete {selectedProducts.size} selected product(s). This action cannot be undone. The deletion will be recorded in the system logs for auditing purposes.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={bulkActionLoading}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleBulkDelete}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                disabled={bulkActionLoading}
+              >
+                {bulkActionLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Delete Permanently
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+
+      {/* Bulk Status Change Dialog */}
+      {canManageListings && (
+        <Dialog open={bulkStatusDialog} onOpenChange={setBulkStatusDialog}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Change Status for {selectedProducts.size} Product(s)</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="grid gap-2">
+                <Label>New Status</Label>
+                <Select value={bulkStatusValue} onValueChange={setBulkStatusValue}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-4 border-t border-border">
+              <Button
+                variant="outline"
+                onClick={() => setBulkStatusDialog(false)}
+                disabled={bulkActionLoading}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleBulkStatusChange}
+                className="gradient-driptyard-hover text-white"
+                disabled={bulkActionLoading}
+              >
+                {bulkActionLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Update Status
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Bulk Verification Change Dialog */}
+      {canManageListings && (
+        <Dialog open={bulkVerificationDialog} onOpenChange={setBulkVerificationDialog}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Change Verification for {selectedProducts.size} Product(s)</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="grid gap-2">
+                <Label>New Verification Status</Label>
+                <Select value={bulkVerificationValue} onValueChange={setBulkVerificationValue}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select verification" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="verified">Verified</SelectItem>
+                    <SelectItem value="unverified">Unverified</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-4 border-t border-border">
+              <Button
+                variant="outline"
+                onClick={() => setBulkVerificationDialog(false)}
+                disabled={bulkActionLoading}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleBulkVerificationChange}
+                className="gradient-driptyard-hover text-white"
+                disabled={bulkActionLoading}
+              >
+                {bulkActionLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Update Verification
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </AdminLayout>
   );
 }

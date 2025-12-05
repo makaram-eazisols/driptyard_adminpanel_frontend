@@ -391,6 +391,63 @@ class ApiClient {
     const response = await this.client.put(`/moderators/${moderatorId}/permissions`, data);
     return response.data;
   }
+
+  // ============ BULK ACTIONS ENDPOINTS ============
+  
+  // Users Bulk Actions
+  async bulkDeleteUsers(userIds) {
+    const response = await this.client.delete("/admin/users/bulk", {
+      data: { user_ids: userIds }
+    });
+    return response.data;
+  }
+
+  async bulkUpdateUserStatus(userIds, isActive) {
+    const response = await this.client.put("/admin/users/bulk/status", {
+      user_ids: userIds,
+      is_active: isActive
+    });
+    return response.data;
+  }
+
+  // Products Bulk Actions
+  async bulkDeleteProducts(productIds) {
+    const response = await this.client.delete("/admin/products/bulk", {
+      data: { product_ids: productIds }
+    });
+    return response.data;
+  }
+
+  async bulkUpdateProductStatus(productIds, isActive) {
+    const response = await this.client.put("/admin/products/bulk/status", {
+      product_ids: productIds,
+      is_active: isActive
+    });
+    return response.data;
+  }
+
+  async bulkUpdateProductVerification(productIds, isVerified) {
+    const response = await this.client.put("/admin/products/bulk/verification", {
+      product_ids: productIds,
+      is_verified: isVerified
+    });
+    return response.data;
+  }
+
+  // Reports Bulk Actions
+  async bulkApproveReports(reportIds) {
+    const response = await this.client.post("/admin/reports/bulk/approve", {
+      report_ids: reportIds
+    });
+    return response.data;
+  }
+
+  async bulkRejectReports(reportIds) {
+    const response = await this.client.post("/admin/reports/bulk/reject", {
+      report_ids: reportIds
+    });
+    return response.data;
+  }
 }
 
 export const apiClient = new ApiClient();

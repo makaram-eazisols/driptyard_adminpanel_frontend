@@ -18,6 +18,17 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { apiClient } from "@/lib/api-client";
 import { notifyError, notifySuccess } from "@/lib/toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -36,6 +47,10 @@ function FlaggedContent() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [pageSize, setPageSize] = useState(10);
+  const [selectedItems, setSelectedItems] = useState(new Set());
+  const [bulkApproveDialog, setBulkApproveDialog] = useState(false);
+  const [bulkRejectDialog, setBulkRejectDialog] = useState(false);
+  const [bulkActionLoading, setBulkActionLoading] = useState(false);
 
   // Check if user can manage flagged content
   const canManageFlaggedContent =
@@ -45,6 +60,8 @@ function FlaggedContent() {
 
   useEffect(() => {
     fetchFlaggedContent();
+    // Clear selection when filters change
+    setSelectedItems(new Set());
   }, [currentPage, searchTerm, status]);
 
   const formatDate = (dateString) => {
@@ -200,6 +217,67 @@ function FlaggedContent() {
     return (status || "").toLowerCase() === "pending";
   };
 
+  // Bulk selection handlers
+  const handleSelectAll = (checked) => {
+    if (checked) {
+      setSelectedItems(new Set(flaggedContent.map((item) => item.reportId)));
+    } else {
+      setSelectedItems(new Set());
+    }
+  };
+
+  const handleSelectItem = (reportId, checked) => {
+    const newSelected = new Set(selectedItems);
+    if (checked) {
+      newSelected.add(reportId);
+    } else {
+      newSelected.delete(reportId);
+    }
+    setSelectedItems(newSelected);
+  };
+
+  const isAllSelected = flaggedContent.length > 0 && selectedItems.size === flaggedContent.length;
+  const isIndeterminate = selectedItems.size > 0 && selectedItems.size < flaggedContent.length;
+
+  // Bulk action handlers
+  const handleBulkApprove = async () => {
+    if (selectedItems.size === 0) return;
+
+    setBulkActionLoading(true);
+    try {
+      const reportIds = Array.from(selectedItems).map(id => parseInt(id, 10));
+      const response = await apiClient.bulkApproveReports(reportIds);
+      notifySuccess(response.message || `${selectedItems.size} report(s) approved successfully`);
+      setSelectedItems(new Set());
+      setBulkApproveDialog(false);
+      fetchFlaggedContent();
+    } catch (error) {
+      console.error("Failed to approve reports:", error);
+      notifyError(error.response?.data?.detail || "Failed to approve reports");
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
+  const handleBulkReject = async () => {
+    if (selectedItems.size === 0) return;
+
+    setBulkActionLoading(true);
+    try {
+      const reportIds = Array.from(selectedItems).map(id => parseInt(id, 10));
+      const response = await apiClient.bulkRejectReports(reportIds);
+      notifySuccess(response.message || `${selectedItems.size} report(s) rejected successfully`);
+      setSelectedItems(new Set());
+      setBulkRejectDialog(false);
+      fetchFlaggedContent();
+    } catch (error) {
+      console.error("Failed to reject reports:", error);
+      notifyError(error.response?.data?.detail || "Failed to reject reports");
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
   return (
     <AdminLayout>
       <div className="space-y-6">
@@ -283,10 +361,60 @@ function FlaggedContent() {
           </div>
         ) : (
           <>
+            {/* Bulk Action Toolbar */}
+            {canManageFlaggedContent && selectedItems.size > 0 && (
+              <div className="flex items-center justify-between rounded-lg border border-border bg-muted/50 p-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-primary">
+                    {selectedItems.size} item(s) selected
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setBulkApproveDialog(true)}
+                    disabled={bulkActionLoading}
+                    className="text-green-600 hover:text-green-700"
+                  >
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Approve
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setBulkRejectDialog(true)}
+                    disabled={bulkActionLoading}
+                    className="text-red-600 hover:text-red-700"
+                  >
+                    <XCircle className="h-4 w-4 mr-2" />
+                    Reject
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSelectedItems(new Set())}
+                    disabled={bulkActionLoading}
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Clear Selection
+                  </Button>
+                </div>
+              </div>
+            )}
+
             <div className="rounded-lg border border-border overflow-hidden">
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/50 hover:bg-muted/50">
+                    {canManageFlaggedContent && (
+                      <TableHead className="h-12 px-4 w-12">
+                        <Checkbox
+                          checked={isAllSelected}
+                          onCheckedChange={handleSelectAll}
+                        />
+                      </TableHead>
+                    )}
                     <TableHead className="h-12 px-4 font-semibold text-secondary max-w-[100px]">Thumbnail</TableHead>
                     <TableHead className="h-12 px-4 font-semibold text-secondary max-w-[250px]">Title</TableHead>
                     <TableHead className="h-12 px-4 font-semibold text-secondary max-w-[100px]">Price</TableHead>
@@ -309,6 +437,14 @@ function FlaggedContent() {
 
                     return (
                       <TableRow key={item.id} className="hover:bg-muted/30 transition-colors">
+                        {canManageFlaggedContent && (
+                          <TableCell className="py-3 px-4">
+                            <Checkbox
+                              checked={selectedItems.has(item.reportId)}
+                              onCheckedChange={(checked) => handleSelectItem(item.reportId, checked)}
+                            />
+                          </TableCell>
+                        )}
                         <TableCell className="py-3 px-4 max-w-[100px]">
                           <div className="h-16 w-16 rounded-lg border border-border overflow-hidden bg-muted/50 shadow-sm">
                             {getPrimaryImage() ? (
@@ -563,6 +699,56 @@ function FlaggedContent() {
             )}
           </DialogContent>
         </Dialog>
+
+        {/* Bulk Approve Dialog */}
+        {canManageFlaggedContent && (
+          <AlertDialog open={bulkApproveDialog} onOpenChange={setBulkApproveDialog}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Approve {selectedItems.size} Report(s)?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will approve {selectedItems.size} selected report(s) and mark them as resolved. This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={bulkActionLoading}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleBulkApprove}
+                  className="bg-green-600 text-white hover:bg-green-700"
+                  disabled={bulkActionLoading}
+                >
+                  {bulkActionLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Approve Reports
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
+
+        {/* Bulk Reject Dialog */}
+        {canManageFlaggedContent && (
+          <AlertDialog open={bulkRejectDialog} onOpenChange={setBulkRejectDialog}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Reject {selectedItems.size} Report(s)?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will reject {selectedItems.size} selected report(s). This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={bulkActionLoading}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleBulkReject}
+                  className="bg-red-600 text-white hover:bg-red-700"
+                  disabled={bulkActionLoading}
+                >
+                  {bulkActionLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Reject Reports
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
       </div>
     </AdminLayout>
   );
