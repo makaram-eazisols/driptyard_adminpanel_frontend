@@ -252,7 +252,7 @@ function Spotlight() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/50 hover:bg-muted/50">
-                    <TableHead className="h-12 px-4 font-semibold text-secondary max-w-[300px]">Product</TableHead>
+                    <TableHead className="h-12 px-4 font-semibold text-secondary max-w-[300px]">Listing</TableHead>
                     <TableHead className="h-12 px-4 font-semibold text-secondary">Seller</TableHead>
                     <TableHead className="h-12 px-4 font-semibold text-secondary">Applied At</TableHead>
                     <TableHead className="h-12 px-4 font-semibold text-secondary">End Time</TableHead>
@@ -287,7 +287,7 @@ function Spotlight() {
                         onDoubleClick={productUrl ? handleRowClick : undefined}
                       >
                         <TableCell className="py-3 px-4 max-w-[300px]">
-                          <div className="flex items-start gap-3">
+                          <div className="flex items-center gap-3">
                             <div className="h-12 w-12 rounded-lg border border-border overflow-hidden bg-muted/50 shadow-sm flex-shrink-0">
                               {item.product_image ? (
                                 <img

@@ -5,7 +5,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, MoreVertical, Edit2, Trash2, Loader2, ChevronLeft, ChevronRight, Star, X, Filter } from "lucide-react";
+import { Search, MoreVertical, Edit2, Trash2, Loader2, ChevronLeft, ChevronRight, Star, X, Filter, ExternalLink, Eye } from "lucide-react";
 import { format } from "date-fns";
 import { apiClient } from "@/lib/api-client";
 import { notifyError, notifySuccess } from "@/lib/toast";
@@ -423,7 +423,7 @@ const formatPrice = (value) => {
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <h1 className="text-3xl font-bold text-secondary">Listings Management</h1>
-            <p className="text-muted-foreground mt-1">Manage your product inventory</p>
+            <p className="text-muted-foreground mt-1">Manage your listings inventory</p>
           </div>
           <div className="flex gap-2">
             <Button
@@ -591,9 +591,27 @@ const formatPrice = (value) => {
                       {products.map((product) => {
                         const image = getPrimaryImage(product);
                         const authBadge = getAuthBadge(product);
+                        const productId = product.id;
+                        const websiteUrl = process.env.NEXT_PUBLIC_WEBSITE_URL || "https://driptyard-finalized-frontend.vercel.app";
+                        // Ensure proper URL construction with /products/ path
+                        let baseUrl = websiteUrl.endsWith('/') ? websiteUrl.slice(0, -1) : websiteUrl;
+                        if (!baseUrl.endsWith('/products')) {
+                          baseUrl = `${baseUrl}/products`;
+                        }
+                        const productUrl = productId ? `${baseUrl}/${productId}` : null;
+                        
+                        const handleRowClick = () => {
+                          if (productUrl) {
+                            window.open(productUrl, "_blank");
+                          }
+                        };
 
                         return (
-                          <TableRow key={product.id} className="hover:bg-muted/30 transition-colors">
+                          <TableRow 
+                            key={product.id} 
+                            className={`hover:bg-muted/30 transition-colors ${productUrl ? "cursor-pointer" : ""}`}
+                            onDoubleClick={productUrl ? handleRowClick : undefined}
+                          >
                             {canManageListings && (
                               <TableCell className="py-3 px-4">
                                 <Checkbox
@@ -642,6 +660,23 @@ const formatPrice = (value) => {
                                       </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
+                                      <DropdownMenuItem
+                                        className="cursor-pointer"
+                                        onClick={() => {
+                                          const websiteUrl = process.env.NEXT_PUBLIC_WEBSITE_URL || "https://driptyard-finalized-frontend.vercel.app";
+                                          let baseUrl = websiteUrl.endsWith('/') ? websiteUrl.slice(0, -1) : websiteUrl;
+                                          if (!baseUrl.endsWith('/products')) {
+                                            baseUrl = `${baseUrl}/products`;
+                                          }
+                                          const productUrl = product.id ? `${baseUrl}/${product.id}` : null;
+                                          if (productUrl) {
+                                            window.open(productUrl, "_blank");
+                                          }
+                                        }}
+                                      >
+                                        <Eye className="h-4 w-4 mr-2" />
+                                        View
+                                      </DropdownMenuItem>
                                       {product.is_verified && product.is_active && canSpotlight && (
                                         <DropdownMenuItem
                                           className="cursor-pointer group flex items-center gap-2 hover:bg-[#E0B74F] hover:text-[#0B0B0D] focus:bg-[#E0B74F] focus:text-[#0B0B0D] transition-colors"
@@ -814,14 +849,34 @@ const formatPrice = (value) => {
                   onCheckedChange={(checked) => setEditProduct({ ...editProduct, is_spotlighted: checked })}
                 />
               </div> */}
-              <div className="flex justify-end gap-2 pt-4">
-                <Button variant="outline" onClick={() => setEditProduct(null)}>
-                  Cancel
+              <div className="flex justify-between items-center pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    const websiteUrl = process.env.NEXT_PUBLIC_WEBSITE_URL || "https://driptyard-finalized-frontend.vercel.app";
+                    let baseUrl = websiteUrl.endsWith('/') ? websiteUrl.slice(0, -1) : websiteUrl;
+                    if (!baseUrl.endsWith('/products')) {
+                      baseUrl = `${baseUrl}/products`;
+                    }
+                    const productUrl = editProduct.id ? `${baseUrl}/${editProduct.id}` : null;
+                    if (productUrl) {
+                      window.open(productUrl, "_blank");
+                    }
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  View Listing
                 </Button>
-                <Button onClick={handleUpdate} disabled={editLoading}>
-                  {editLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  Save Changes
-                </Button>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => setEditProduct(null)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleUpdate} disabled={editLoading}>
+                    {editLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    Save Changes
+                  </Button>
+                </div>
               </div>
             </div>
           )}
@@ -900,30 +955,50 @@ const formatPrice = (value) => {
                       </div>
                     </div>
                   </div>
-                  <div className="flex justify-end gap-2 pt-2">
+                  <div className="flex justify-between items-center pt-2">
                     <Button
                       variant="outline"
                       onClick={() => {
-                        setSpotlightProduct(null);
-                        setSpotlightDuration("24");
-                        setCustomDate(null);
-                        setExistingSpotlight(null);
+                        const websiteUrl = process.env.NEXT_PUBLIC_WEBSITE_URL || "https://driptyard-finalized-frontend.vercel.app";
+                        let baseUrl = websiteUrl.endsWith('/') ? websiteUrl.slice(0, -1) : websiteUrl;
+                        if (!baseUrl.endsWith('/products')) {
+                          baseUrl = `${baseUrl}/products`;
+                        }
+                        const productUrl = spotlightProduct?.id ? `${baseUrl}/${spotlightProduct.id}` : null;
+                        if (productUrl) {
+                          window.open(productUrl, "_blank");
+                        }
                       }}
+                      className="flex items-center gap-2"
                     >
-                      Close
+                      <ExternalLink className="h-4 w-4" />
+                      View Listing
                     </Button>
-                    {canRemoveSpotlight && (
+                    <div className="flex gap-2">
                       <Button
-                        onClick={handleRemoveSpotlight}
-                        disabled={removingSpotlight}
-                        variant="destructive"
-                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        variant="outline"
+                        onClick={() => {
+                          setSpotlightProduct(null);
+                          setSpotlightDuration("24");
+                          setCustomDate(null);
+                          setExistingSpotlight(null);
+                        }}
                       >
-                        {removingSpotlight && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                        <X className="h-4 w-4 mr-2" />
-                        Remove Spotlight
+                        Close
                       </Button>
-                    )}
+                      {canRemoveSpotlight && (
+                        <Button
+                          onClick={handleRemoveSpotlight}
+                          disabled={removingSpotlight}
+                          variant="destructive"
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          {removingSpotlight && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                          <X className="h-4 w-4 mr-2" />
+                          Remove Spotlight
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
               ) : (
@@ -1065,27 +1140,47 @@ const formatPrice = (value) => {
                       </div>
                     )}
                   </div>
-                  <div className="flex justify-end gap-2 pt-4">
+                  <div className="flex justify-between items-center pt-4">
                     <Button
                       variant="outline"
                       onClick={() => {
-                        setSpotlightProduct(null);
-                        setSpotlightDuration("24");
-                        setCustomDate(null);
-                        setExistingSpotlight(null);
+                        const websiteUrl = process.env.NEXT_PUBLIC_WEBSITE_URL || "https://driptyard-finalized-frontend.vercel.app";
+                        let baseUrl = websiteUrl.endsWith('/') ? websiteUrl.slice(0, -1) : websiteUrl;
+                        if (!baseUrl.endsWith('/products')) {
+                          baseUrl = `${baseUrl}/products`;
+                        }
+                        const productUrl = spotlightProduct?.id ? `${baseUrl}/${spotlightProduct.id}` : null;
+                        if (productUrl) {
+                          window.open(productUrl, "_blank");
+                        }
                       }}
+                      className="flex items-center gap-2"
                     >
-                      Cancel
+                      <ExternalLink className="h-4 w-4" />
+                      View Listing
                     </Button>
-                    {canSpotlight && (
+                    <div className="flex gap-2">
                       <Button
-                        onClick={handleApplySpotlight}
-                        disabled={spotlightLoading || (spotlightDuration === "custom" && !customDate)}
+                        variant="outline"
+                        onClick={() => {
+                          setSpotlightProduct(null);
+                          setSpotlightDuration("24");
+                          setCustomDate(null);
+                          setExistingSpotlight(null);
+                        }}
                       >
-                        {spotlightLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                        Apply Spotlight
+                        Cancel
                       </Button>
-                    )}
+                      {canSpotlight && (
+                        <Button
+                          onClick={handleApplySpotlight}
+                          disabled={spotlightLoading || (spotlightDuration === "custom" && !customDate)}
+                        >
+                          {spotlightLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                          Apply Spotlight
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </>
               )}
