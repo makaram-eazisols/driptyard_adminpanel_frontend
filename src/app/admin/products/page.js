@@ -592,7 +592,7 @@ const formatPrice = (value) => {
                         const image = getPrimaryImage(product);
                         const authBadge = getAuthBadge(product);
                         const productId = product.id;
-                        const websiteUrl = process.env.NEXT_PUBLIC_WEBSITE_URL || "https://driptyard-finalized-frontend.vercel.app";
+                        const websiteUrl = process.env.NEXT_PUBLIC_WEBSITE_URL || "https://driptyard.vercel.app";
                         // Ensure proper URL construction with /products/ path
                         let baseUrl = websiteUrl.endsWith('/') ? websiteUrl.slice(0, -1) : websiteUrl;
                         if (!baseUrl.endsWith('/products')) {
@@ -663,7 +663,7 @@ const formatPrice = (value) => {
                                       <DropdownMenuItem
                                         className="cursor-pointer"
                                         onClick={() => {
-                                          const websiteUrl = process.env.NEXT_PUBLIC_WEBSITE_URL || "https://driptyard-finalized-frontend.vercel.app";
+                                          const websiteUrl = process.env.NEXT_PUBLIC_WEBSITE_URL || "https://driptyard.vercel.app";
                                           let baseUrl = websiteUrl.endsWith('/') ? websiteUrl.slice(0, -1) : websiteUrl;
                                           if (!baseUrl.endsWith('/products')) {
                                             baseUrl = `${baseUrl}/products`;
@@ -853,7 +853,7 @@ const formatPrice = (value) => {
                 <Button
                   variant="outline"
                   onClick={() => {
-                    const websiteUrl = process.env.NEXT_PUBLIC_WEBSITE_URL || "https://driptyard-finalized-frontend.vercel.app";
+                    const websiteUrl = process.env.NEXT_PUBLIC_WEBSITE_URL || "https://driptyard.vercel.app";
                     let baseUrl = websiteUrl.endsWith('/') ? websiteUrl.slice(0, -1) : websiteUrl;
                     if (!baseUrl.endsWith('/products')) {
                       baseUrl = `${baseUrl}/products`;
@@ -959,7 +959,7 @@ const formatPrice = (value) => {
                     <Button
                       variant="outline"
                       onClick={() => {
-                        const websiteUrl = process.env.NEXT_PUBLIC_WEBSITE_URL || "https://driptyard-finalized-frontend.vercel.app";
+                        const websiteUrl = process.env.NEXT_PUBLIC_WEBSITE_URL || "https://driptyard.vercel.app";
                         let baseUrl = websiteUrl.endsWith('/') ? websiteUrl.slice(0, -1) : websiteUrl;
                         if (!baseUrl.endsWith('/products')) {
                           baseUrl = `${baseUrl}/products`;
@@ -1144,7 +1144,7 @@ const formatPrice = (value) => {
                     <Button
                       variant="outline"
                       onClick={() => {
-                        const websiteUrl = process.env.NEXT_PUBLIC_WEBSITE_URL || "https://driptyard-finalized-frontend.vercel.app";
+                        const websiteUrl = process.env.NEXT_PUBLIC_WEBSITE_URL || "https://driptyard.vercel.app";
                         let baseUrl = websiteUrl.endsWith('/') ? websiteUrl.slice(0, -1) : websiteUrl;
                         if (!baseUrl.endsWith('/products')) {
                           baseUrl = `${baseUrl}/products`;

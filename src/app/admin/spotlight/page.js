@@ -264,7 +264,7 @@ function Spotlight() {
                 <TableBody>
                   {history.map((item) => {
                     const productId = item.product_id;
-                    const websiteUrl = process.env.NEXT_PUBLIC_WEBSITE_URL || "https://driptyard-finalized-frontend.vercel.app";
+                    const websiteUrl = process.env.NEXT_PUBLIC_WEBSITE_URL || "https://driptyard.vercel.app";
                     // Ensure proper URL construction with /products/ path
                     // Remove trailing slash and check if /products/ already exists
                     let baseUrl = websiteUrl.endsWith('/') ? websiteUrl.slice(0, -1) : websiteUrl;
