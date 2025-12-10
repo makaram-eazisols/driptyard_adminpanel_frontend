@@ -636,7 +636,7 @@ const formatPrice = (value) => {
                               </div>
                             </TableCell>
                             <TableCell className="py-3 px-4 max-w-[250px]">
-                              <p className="font-semibold text-sm text-primary leading-tight break-words">{product.title || "Untitled listing"}</p>
+                              <a href={productUrl} target="_blank" className="font-semibold text-sm text-primary leading-tight break-words">{product.title || "Untitled listing"}</a>
                             </TableCell>
                             <TableCell className="py-3 px-4 max-w-[150px]">
                               <p className="text-sm text-foreground truncate">{product?.owner_name}</p>

@@ -410,6 +410,14 @@ class ApiClient {
     return response.data;
   }
 
+  async bulkSuspendUsers(userIds, isSuspended) {
+    const response = await this.client.put("/admin/users/bulk/suspend", {
+      user_ids: userIds,
+      is_suspended: isSuspended
+    });
+    return response.data;
+  }
+
   // Products Bulk Actions
   async bulkDeleteProducts(productIds) {
     const response = await this.client.delete("/admin/products/bulk", {

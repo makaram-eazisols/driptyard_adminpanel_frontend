@@ -82,6 +82,8 @@ function Users() {
   const [selectedUsers, setSelectedUsers] = useState(new Set());
   const [bulkDeleteDialog, setBulkDeleteDialog] = useState(false);
   const [bulkStatusDialog, setBulkStatusDialog] = useState(false);
+  const [bulkSuspendDialog, setBulkSuspendDialog] = useState(false);
+  const [bulkReinstateDialog, setBulkReinstateDialog] = useState(false);
   const [bulkStatusValue, setBulkStatusValue] = useState("active");
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
 
@@ -109,6 +111,8 @@ function Users() {
           params.is_active = true;
         } else if (status === "inactive") {
           params.is_active = false;
+        } else if (status === "isSuspend") {
+          params.isSuspend = true;
         }
       }
 
@@ -121,6 +125,8 @@ function Users() {
         customerUsers = customerUsers.filter((user) => user.is_active && !user.is_banned && user.is_verified);
       } else if (status === "inactive") {
         customerUsers = customerUsers.filter((user) => !user.is_active || user.is_banned || !user.is_verified);
+      } else if (status === "isSuspend") {
+        customerUsers = customerUsers.filter((user) => user.is_suspended);
       }
       
       setUsers(customerUsers);
@@ -145,6 +151,7 @@ function Users() {
     { value: "all", label: "All Status" },
     { value: "active", label: "Active" },
     { value: "inactive", label: "Inactive" },
+    { value: "isSuspend", label: "Suspended" },
   ];
 
   const hasActiveFilters = searchTerm || (status && status !== "all");
@@ -370,7 +377,7 @@ function Users() {
   };
 
   const getStatusText = (user) => {
-    if (user.is_banned) return "Banned";
+    if (user.is_banned) return "Inactive";
     if (user.is_suspended) return "Suspended";
     if (!user.is_active) return "Inactive";
     if (!user.is_verified) return "Unverified";
@@ -438,6 +445,44 @@ function Users() {
     } catch (error) {
       console.error("Failed to update user status:", error);
       notifyError(error.response?.data?.detail || "Failed to update user status");
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
+  const handleBulkSuspend = async () => {
+    if (selectedUsers.size === 0) return;
+
+    setBulkActionLoading(true);
+    try {
+      const userIds = Array.from(selectedUsers).map(id => parseInt(id, 10));
+      const response = await apiClient.bulkSuspendUsers(userIds, true);
+      notifySuccess(response.message || `${selectedUsers.size} user(s) suspended successfully. They will be notified via email.`);
+      setSelectedUsers(new Set());
+      setBulkSuspendDialog(false);
+      fetchUsers();
+    } catch (error) {
+      console.error("Failed to suspend users:", error);
+      notifyError(error.response?.data?.detail || "Failed to suspend users");
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
+  const handleBulkReinstate = async () => {
+    if (selectedUsers.size === 0) return;
+
+    setBulkActionLoading(true);
+    try {
+      const userIds = Array.from(selectedUsers).map(id => parseInt(id, 10));
+      const response = await apiClient.bulkSuspendUsers(userIds, false);
+      notifySuccess(response.message || `${selectedUsers.size} user(s) reinstated successfully. They will be notified via email.`);
+      setSelectedUsers(new Set());
+      setBulkReinstateDialog(false);
+      fetchUsers();
+    } catch (error) {
+      console.error("Failed to reinstate users:", error);
+      notifyError(error.response?.data?.detail || "Failed to reinstate users");
     } finally {
       setBulkActionLoading(false);
     }
@@ -666,6 +711,26 @@ function Users() {
                       disabled={bulkActionLoading}
                     >
                       Change Status
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setBulkSuspendDialog(true)}
+                      disabled={bulkActionLoading}
+                      className="flex items-center gap-2"
+                    >
+                      <Ban className="h-4 w-4" />
+                      Suspend
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setBulkReinstateDialog(true)}
+                      disabled={bulkActionLoading}
+                      className="flex items-center gap-2"
+                    >
+                      <Unlock className="h-4 w-4" />
+                      Reinstate
                     </Button>
                     <Button
                       variant="destructive"
@@ -1516,6 +1581,56 @@ function Users() {
             </div>
           </DialogContent>
         </Dialog>
+      )}
+
+      {/* Bulk Suspend Dialog */}
+      {canManageUsers && (
+        <AlertDialog open={bulkSuspendDialog} onOpenChange={setBulkSuspendDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Suspend {selectedUsers.size} User(s)?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will suspend {selectedUsers.size} selected user account(s). They will be notified via email and will not be able to access their accounts until reinstated.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={bulkActionLoading}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleBulkSuspend}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                disabled={bulkActionLoading}
+              >
+                {bulkActionLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Suspend
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+
+      {/* Bulk Reinstate Dialog */}
+      {canManageUsers && (
+        <AlertDialog open={bulkReinstateDialog} onOpenChange={setBulkReinstateDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Reinstate {selectedUsers.size} User(s)?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will reinstate {selectedUsers.size} selected user account(s). They will be notified via email and will regain access to their accounts.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={bulkActionLoading}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleBulkReinstate}
+                className="gradient-driptyard-hover text-white"
+                disabled={bulkActionLoading}
+              >
+                {bulkActionLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Reinstate
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       )}
     </AdminLayout>
   );

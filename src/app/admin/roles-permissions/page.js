@@ -83,6 +83,8 @@ function RolesAndPermissions() {
   const [selectedModerators, setSelectedModerators] = useState(new Set());
   const [bulkDeleteDialog, setBulkDeleteDialog] = useState(false);
   const [bulkStatusDialog, setBulkStatusDialog] = useState(false);
+  const [bulkSuspendDialog, setBulkSuspendDialog] = useState(false);
+  const [bulkReinstateDialog, setBulkReinstateDialog] = useState(false);
   const [bulkStatusValue, setBulkStatusValue] = useState("active");
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
 
@@ -441,7 +443,7 @@ function RolesAndPermissions() {
   };
 
   const getStatusText = (moderator) => {
-    if (moderator.is_banned) return "Banned";
+    if (moderator.is_banned) return "Inactive";
     if (moderator.is_suspended) return "Suspended";
     if (!moderator.is_active) return "Inactive";
     return "Active";
@@ -509,6 +511,44 @@ function RolesAndPermissions() {
     }
   };
 
+  const handleBulkSuspend = async () => {
+    if (selectedModerators.size === 0) return;
+
+    setBulkActionLoading(true);
+    try {
+      const moderatorIds = Array.from(selectedModerators).map(id => parseInt(id, 10));
+      const response = await apiClient.bulkSuspendUsers(moderatorIds, true);
+      notifySuccess(response.message || `${selectedModerators.size} moderator(s) suspended successfully. They will be notified via email.`);
+      setSelectedModerators(new Set());
+      setBulkSuspendDialog(false);
+      fetchModerators();
+    } catch (error) {
+      console.error("Failed to suspend moderators:", error);
+      notifyError(error.response?.data?.detail || "Failed to suspend moderators");
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
+  const handleBulkReinstate = async () => {
+    if (selectedModerators.size === 0) return;
+
+    setBulkActionLoading(true);
+    try {
+      const moderatorIds = Array.from(selectedModerators).map(id => parseInt(id, 10));
+      const response = await apiClient.bulkSuspendUsers(moderatorIds, false);
+      notifySuccess(response.message || `${selectedModerators.size} moderator(s) reinstated successfully. They will be notified via email.`);
+      setSelectedModerators(new Set());
+      setBulkReinstateDialog(false);
+      fetchModerators();
+    } catch (error) {
+      console.error("Failed to reinstate moderators:", error);
+      notifyError(error.response?.data?.detail || "Failed to reinstate moderators");
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
   const handleCreateUser = async () => {
     // Validation
     if (!createUserForm.email || !createUserForm.password || !createUserForm.username || !phoneValue) {
@@ -568,7 +608,35 @@ function RolesAndPermissions() {
         is_customer: false,
       };
 
-      await apiClient.createAdminUser(payload);
+      const createResponse = await apiClient.createAdminUser(payload);
+      
+      // Extract moderator ID from response
+      const moderatorId = createResponse.id || createResponse.user_id;
+      
+      if (moderatorId) {
+        // Set default permissions: can_see_dashboard = true, all others = false
+        try {
+          const defaultPermissions = {
+            can_see_dashboard: true,
+            can_see_users: false,
+            can_manage_users: false,
+            can_see_listings: false,
+            can_manage_listings: false,
+            can_see_spotlight_history: false,
+            can_spotlight: false,
+            can_remove_spotlight: false,
+            can_see_flagged_content: false,
+            can_manage_flagged_content: false,
+          };
+          
+          await apiClient.updateModeratorPermissions(moderatorId, defaultPermissions);
+        } catch (permissionsError) {
+          console.error("Failed to set default permissions:", permissionsError);
+          // Show warning but don't block success flow
+          notifyError("Moderator created but failed to set default permissions. Please update permissions manually.");
+        }
+      }
+      
       notifySuccess("User created successfully");
       setIsCreateDialogOpen(false);
       setCreateUserForm({
@@ -696,6 +764,26 @@ function RolesAndPermissions() {
                       disabled={bulkActionLoading}
                     >
                       Change Status
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setBulkSuspendDialog(true)}
+                      disabled={bulkActionLoading}
+                      className="flex items-center gap-2"
+                    >
+                      <Ban className="h-4 w-4" />
+                      Suspend
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setBulkReinstateDialog(true)}
+                      disabled={bulkActionLoading}
+                      className="flex items-center gap-2"
+                    >
+                      <Unlock className="h-4 w-4" />
+                      Reinstate
                     </Button>
                     <Button
                       variant="destructive"
@@ -1563,6 +1651,56 @@ function RolesAndPermissions() {
               </div>
             </DialogContent>
           </Dialog>
+        )}
+
+        {/* Bulk Suspend Dialog */}
+        {canManageUsers && (
+          <AlertDialog open={bulkSuspendDialog} onOpenChange={setBulkSuspendDialog}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Suspend {selectedModerators.size} Moderator(s)?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will suspend {selectedModerators.size} selected moderator account(s). They will be notified via email and will not be able to access their accounts until reinstated.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={bulkActionLoading}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleBulkSuspend}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  disabled={bulkActionLoading}
+                >
+                  {bulkActionLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Suspend
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
+
+        {/* Bulk Reinstate Dialog */}
+        {canManageUsers && (
+          <AlertDialog open={bulkReinstateDialog} onOpenChange={setBulkReinstateDialog}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Reinstate {selectedModerators.size} Moderator(s)?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will reinstate {selectedModerators.size} selected moderator account(s). They will be notified via email and will regain access to their accounts.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={bulkActionLoading}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleBulkReinstate}
+                  className="gradient-driptyard-hover text-white"
+                  disabled={bulkActionLoading}
+                >
+                  {bulkActionLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Reinstate
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         )}
       </div>
     </AdminLayout>
