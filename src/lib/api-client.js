@@ -442,6 +442,32 @@ class ApiClient {
     return response.data;
   }
 
+  async bulkAddProductsToSpotlight(productIds, data) {
+    const response = await this.client.post("/admin/products/bulk/spotlight", {
+      product_ids: productIds,
+      action: "add",
+      ...data
+    });
+    return response.data;
+  }
+
+  async bulkEditProductsSpotlight(productIds, data) {
+    const response = await this.client.post("/admin/products/bulk/spotlight", {
+      product_ids: productIds,
+      action: "edit",
+      ...data
+    });
+    return response.data;
+  }
+
+  async bulkRemoveProductsSpotlight(productIds) {
+    const response = await this.client.post("/admin/products/bulk/spotlight", {
+      product_ids: productIds,
+      action: "remove"
+    });
+    return response.data;
+  }
+
   // Reports Bulk Actions
   async bulkApproveReports(reportIds) {
     const response = await this.client.post("/admin/reports/bulk/approve", {

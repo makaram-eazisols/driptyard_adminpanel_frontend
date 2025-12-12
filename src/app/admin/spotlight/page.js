@@ -6,36 +6,68 @@ import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Star, ChevronLeft, ChevronRight, Filter, X } from "lucide-react";
+import { Star, ChevronLeft, ChevronRight, Filter, X, Edit2, Trash2, MoreVertical, Loader2, ExternalLink } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
+import { notifyError, notifySuccess } from "@/lib/toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { format } from "date-fns";
 
 const STATUS_OPTIONS = [
   { value: "all", label: "All Status" },
-  { value: "applied", label: "Applied" },
+  { value: "active", label: "Active" },
+  { value: "removed", label: "Removed" },
   { value: "expired", label: "Expired" },
+  { value: "edited", label: "Edited" },
 ];
 
 function Spotlight() {
+  const { user } = useAuth();
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [pageSize, setPageSize] = useState(20);
-  const [productId, setProductId] = useState("");
   const [status, setStatus] = useState("all");
   const [dateFrom, setDateFrom] = useState(null);
   const [dateTo, setDateTo] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [editItem, setEditItem] = useState(null);
+  const [editDuration, setEditDuration] = useState("24");
+  const [editCustomDate, setEditCustomDate] = useState(null);
+  const [editLoading, setEditLoading] = useState(false);
+  const [removeItem, setRemoveItem] = useState(null);
+  const [removeLoading, setRemoveLoading] = useState(false);
   const { toast } = useToast();
+
+  // Check permissions
+  const canSpotlight = user?.is_admin || user?.permissions?.can_spotlight === true;
+  const canRemoveSpotlight = user?.is_admin || user?.permissions?.can_remove_spotlight === true;
 
   const fetchHistory = async () => {
     try {
@@ -45,24 +77,26 @@ function Spotlight() {
         page_size: pageSize,
       };
 
-      if (productId) {
-        params.product_id = productId;
-      }
-
       if (status && status !== "all") {
         params.status = status;
       }
 
       if (dateFrom) {
+        // Use local date components to avoid timezone shift
         const fromDate = new Date(dateFrom);
-        fromDate.setHours(0, 0, 0, 0);
-        params.date_from = fromDate.toISOString();
+        const year = fromDate.getFullYear();
+        const month = String(fromDate.getMonth() + 1).padStart(2, '0');
+        const day = String(fromDate.getDate()).padStart(2, '0');
+        params.date_from = `${year}-${month}-${day}T00:00:00.000Z`;
       }
 
       if (dateTo) {
+        // Use local date components to avoid timezone shift
         const toDate = new Date(dateTo);
-        toDate.setHours(23, 59, 59, 999);
-        params.date_to = toDate.toISOString();
+        const year = toDate.getFullYear();
+        const month = String(toDate.getMonth() + 1).padStart(2, '0');
+        const day = String(toDate.getDate()).padStart(2, '0');
+        params.date_to = `${year}-${month}-${day}T23:59:59.999Z`;
       }
 
       const data = await apiClient.getSpotlightHistory(params);
@@ -83,10 +117,9 @@ function Spotlight() {
 
   useEffect(() => {
     fetchHistory();
-  }, [page, productId, status, dateFrom, dateTo]);
+  }, [page, status, dateFrom, dateTo]);
 
   const handleClearFilters = () => {
-    setProductId("");
     setStatus("all");
     setDateFrom(null);
     setDateTo(null);
@@ -95,13 +128,19 @@ function Spotlight() {
 
   const getStatusBadge = (item) => {
     const action = item.action?.toLowerCase() || "";
-    if (action === "applied") {
-      return <Badge variant="success" className="text-xs">Applied</Badge>;
+    if (action === "active") {
+      return <Badge variant="success" className="text-xs">Active</Badge>;
     }
     if (action === "expired") {
       return <Badge variant="destructive" className="text-xs">Expired</Badge>;
     }
-    return <Badge variant="outline" className="text-xs">{action || "—"}</Badge>;
+    if (action === "removed") {
+      return <Badge variant="destructive" className="text-xs">Removed</Badge>;
+    }
+    if (action === "edited") {
+      return <Badge variant="outline" className="text-xs">Edited</Badge>;
+    }
+    return <Badge variant="outline" className="text-xs capitalize">{action || "—"}</Badge>;
   };
 
   const formatDate = (dateString) => {
@@ -114,7 +153,64 @@ function Spotlight() {
   };
 
 
-  const hasActiveFilters = productId || (status && status !== "all") || dateFrom || dateTo;
+  const hasActiveFilters = (status && status !== "all") || dateFrom || dateTo;
+
+  // Individual edit handler
+  const handleEdit = async () => {
+    if (!editItem) return;
+
+    setEditLoading(true);
+    try {
+      const productIds = [editItem.product_id || editItem.id];
+      let requestData = {};
+
+      if (editDuration === "custom" && editCustomDate) {
+        const now = new Date();
+        const selectedDate = new Date(editCustomDate);
+        if (selectedDate > now) {
+          requestData.custom_end_time = selectedDate.toISOString();
+        } else {
+          notifyError("Custom date must be in the future");
+          setEditLoading(false);
+          return;
+        }
+      } else {
+        requestData.duration_hours = parseInt(editDuration);
+      }
+
+      const response = await apiClient.bulkEditProductsSpotlight(productIds, requestData);
+      notifySuccess(response.message || "Spotlight updated successfully");
+      setEditItem(null);
+      setEditDuration("24");
+      setEditCustomDate(null);
+      fetchHistory();
+    } catch (error) {
+      console.error("Failed to edit spotlight:", error);
+      notifyError(error.response?.data?.detail || "Failed to edit spotlight");
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  // Individual remove handler
+  const handleRemove = async () => {
+    if (!removeItem) return;
+
+    setRemoveLoading(true);
+    try {
+      const productIds = [removeItem.product_id || removeItem.id];
+      const response = await apiClient.bulkRemoveProductsSpotlight(productIds);
+      notifySuccess(response.message || "Spotlight removed successfully");
+      setRemoveItem(null);
+      fetchHistory();
+    } catch (error) {
+      console.error("Failed to remove spotlight:", error);
+      notifyError(error.response?.data?.detail || "Failed to remove spotlight");
+    } finally {
+      setRemoveLoading(false);
+    }
+  };
+
 
   return (
     <AdminLayout>
@@ -134,7 +230,7 @@ function Spotlight() {
               Filters
               {hasActiveFilters && (
                 <Badge variant="secondary" className="ml-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs">
-                  {[productId, status && status !== "all" ? status : null, dateFrom, dateTo].filter(Boolean).length}
+                  {[status && status !== "all" ? status : null, dateFrom, dateTo].filter(Boolean).length}
                 </Badge>
               )}
             </Button>
@@ -150,19 +246,7 @@ function Spotlight() {
         {/* Filters */}
         {showFilters && (
           <div className="rounded-lg border border-border bg-background p-4 space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="product-id">Product ID</Label>
-                <Input
-                  id="product-id"
-                  placeholder="Enter product ID"
-                  value={productId}
-                  onChange={(e) => {
-                    setProductId(e.target.value);
-                    setPage(1);
-                  }}
-                />
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="status">Status</Label>
                 <Select value={status} onValueChange={(value) => {
@@ -182,7 +266,7 @@ function Spotlight() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Date From</Label>
+                <Label>Started Date</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
@@ -206,7 +290,7 @@ function Spotlight() {
                 </Popover>
               </div>
               <div className="space-y-2">
-                <Label>Date To</Label>
+                <Label>Ended Date</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
@@ -254,11 +338,14 @@ function Spotlight() {
                   <TableRow className="bg-muted/50 hover:bg-muted/50">
                     <TableHead className="h-12 px-4 font-semibold text-secondary max-w-[300px]">Listing</TableHead>
                     <TableHead className="h-12 px-4 font-semibold text-secondary">Seller</TableHead>
-                    <TableHead className="h-12 px-4 font-semibold text-secondary">Applied At</TableHead>
+                    <TableHead className="h-12 px-4 font-semibold text-secondary">Started At</TableHead>
                     <TableHead className="h-12 px-4 font-semibold text-secondary">End Time</TableHead>
                     <TableHead className="h-12 px-4 font-semibold text-secondary">Duration</TableHead>
                     <TableHead className="h-12 px-4 font-semibold text-secondary">Applied By</TableHead>
                     <TableHead className="h-12 px-4 font-semibold text-secondary">Status</TableHead>
+                    {(canSpotlight || canRemoveSpotlight) && (
+                      <TableHead className="h-12 px-4 text-right font-semibold text-secondary">Actions</TableHead>
+                    )}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -312,7 +399,7 @@ function Spotlight() {
                           <p className="text-sm text-foreground">@{item.seller_username || "—"}</p>
                         </TableCell>
                         <TableCell className="py-3 px-4">
-                          <p className="text-sm text-foreground">{formatDate(item.start_time || item.created_at)}</p>
+                          <p className="text-sm text-foreground">{formatDate(item.start_time)}</p>
                         </TableCell>
                         <TableCell className="py-3 px-4">
                           <p className="text-sm text-foreground">{formatDate(item.end_time)}</p>
@@ -328,6 +415,61 @@ function Spotlight() {
                         <TableCell className="py-3 px-4">
                           {getStatusBadge(item)}
                         </TableCell>
+                        {(canSpotlight || canRemoveSpotlight) && (
+                          <TableCell className="py-3 px-4 text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                {productUrl && (
+                                  <DropdownMenuItem
+                                    className="cursor-pointer"
+                                    onClick={() => {
+                                      if (productUrl) {
+                                        window.open(productUrl, "_blank");
+                                      }
+                                    }}
+                                  >
+                                    <ExternalLink className="h-4 w-4 mr-2" />
+                                    View Listing
+                                  </DropdownMenuItem>
+                                )}
+                                {canSpotlight && (
+                                  <DropdownMenuItem
+                                    className="cursor-pointer group flex items-center gap-2 hover:bg-[#E0B74F] hover:text-[#0B0B0D] focus:bg-[#E0B74F] focus:text-[#0B0B0D] transition-colors"
+                                    onClick={() => {
+                                      setEditItem(item);
+                                      // Set default duration based on item
+                                      if (item.duration_hours) {
+                                        setEditDuration(String(item.duration_hours));
+                                      } else if (item.end_time) {
+                                        setEditDuration("custom");
+                                        setEditCustomDate(new Date(item.end_time));
+                                      } else {
+                                        setEditDuration("24");
+                                      }
+                                    }}
+                                  >
+                                    <Edit2 className="h-4 w-4 text-accent transition-colors group-hover:text-[#0B0B0D] group-focus:text-[#0B0B0D]" />
+                                    Edit
+                                  </DropdownMenuItem>
+                                )}
+                                {canRemoveSpotlight && (
+                                  <DropdownMenuItem
+                                    className="text-destructive cursor-pointer focus:text-destructive"
+                                    onClick={() => setRemoveItem(item)}
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Remove
+                                  </DropdownMenuItem>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        )}
                       </TableRow>
                     );
                   })}
@@ -366,6 +508,242 @@ function Spotlight() {
             </>
           )}
         </div>
+
+        {/* Edit Spotlight Dialog */}
+        {canSpotlight && (
+          <Dialog open={!!editItem} onOpenChange={() => {
+            setEditItem(null);
+            setEditDuration("24");
+            setEditCustomDate(null);
+          }}>
+            <DialogContent className="max-w-md" onOpenAutoFocus={(e) => e.preventDefault()}>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Edit2 className="h-5 w-5 text-accent" />
+                  Edit Spotlight
+                </DialogTitle>
+              </DialogHeader>
+              {editItem && (
+                <div className="space-y-6 py-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-muted-foreground">Listing</Label>
+                      <p className="text-base font-semibold text-primary">{editItem.product_title || "Untitled listing"}</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-muted-foreground">Seller</Label>
+                      <p className="text-base font-medium text-foreground">@{editItem.seller_username || "—"}</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <Label className="text-base font-semibold">Choose New Spotlight Duration</Label>
+                    <RadioGroup value={editDuration} onValueChange={setEditDuration} className="flex flex-wrap gap-6 mt-2">
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="24" id="edit-24h" />
+                        <Label htmlFor="edit-24h" className="cursor-pointer font-normal">24 Hours</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="72" id="edit-3d" />
+                        <Label htmlFor="edit-3d" className="cursor-pointer font-normal">3 Days</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="168" id="edit-7d" />
+                        <Label htmlFor="edit-7d" className="cursor-pointer font-normal">7 Days</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="custom" id="edit-custom" />
+                        <Label htmlFor="edit-custom" className="cursor-pointer font-normal">Custom</Label>
+                      </div>
+                    </RadioGroup>
+                    {editDuration === "custom" && (
+                      <div className="mt-4 space-y-3">
+                        <div className="space-y-2">
+                          <Label>Select Date</Label>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className="w-full justify-start text-left font-normal border border-border bg-background hover:border-[#E0B74F] hover:bg-background transition-colors"
+                              >
+                                {editCustomDate ? (
+                                  new Date(editCustomDate).toLocaleDateString()
+                                ) : (
+                                  <span className="text-muted-foreground">Pick a date</span>
+                                )}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar
+                                mode="single"
+                                selected={editCustomDate}
+                                onSelect={(date) => {
+                                  if (date) {
+                                    const newDate = new Date(date);
+                                    if (editCustomDate) {
+                                      newDate.setHours(editCustomDate.getHours(), editCustomDate.getMinutes());
+                                    } else {
+                                      newDate.setHours(23, 59);
+                                    }
+                                    setEditCustomDate(newDate);
+                                  } else {
+                                    setEditCustomDate(null);
+                                  }
+                                }}
+                                disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                        {editCustomDate && (
+                          <div className="space-y-2">
+                            <Label>Select Time</Label>
+                            <div className="flex items-center gap-2">
+                              <Select
+                                value={editCustomDate ? String(new Date(editCustomDate).getHours() % 12 || 12) : "1"}
+                                onValueChange={(value) => {
+                                  if (editCustomDate) {
+                                    const newDate = new Date(editCustomDate);
+                                    const currentHours = newDate.getHours();
+                                    const isPM = currentHours >= 12;
+                                    const newHours = isPM ? parseInt(value) + 12 : parseInt(value);
+                                    newDate.setHours(newHours % 24, newDate.getMinutes());
+                                    setEditCustomDate(newDate);
+                                  }
+                                }}
+                              >
+                                <SelectTrigger className="w-20">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {Array.from({ length: 12 }, (_, i) => (
+                                    <SelectItem key={i + 1} value={String(i + 1)}>
+                                      {i + 1}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <span className="text-muted-foreground">:</span>
+                              <Select
+                                value={editCustomDate ? String(new Date(editCustomDate).getMinutes()).padStart(2, "0") : "00"}
+                                onValueChange={(value) => {
+                                  if (editCustomDate) {
+                                    const newDate = new Date(editCustomDate);
+                                    newDate.setMinutes(parseInt(value));
+                                    setEditCustomDate(newDate);
+                                  }
+                                }}
+                              >
+                                <SelectTrigger className="w-20">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {Array.from({ length: 60 }, (_, i) => (
+                                    <SelectItem key={i} value={String(i).padStart(2, "0")}>
+                                      {String(i).padStart(2, "0")}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <Select
+                                value={editCustomDate && new Date(editCustomDate).getHours() >= 12 ? "PM" : "AM"}
+                                onValueChange={(value) => {
+                                  if (editCustomDate) {
+                                    const newDate = new Date(editCustomDate);
+                                    const currentHours = newDate.getHours();
+                                    const isPM = value === "PM";
+                                    const hour12 = currentHours % 12 || 12;
+                                    newDate.setHours(isPM ? hour12 + 12 : hour12 % 12, newDate.getMinutes());
+                                    setEditCustomDate(newDate);
+                                  }
+                                }}
+                              >
+                                <SelectTrigger className="w-20">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="AM">AM</SelectItem>
+                                  <SelectItem value="PM">PM</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex justify-between items-center pt-4">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        const websiteUrl = process.env.NEXT_PUBLIC_WEBSITE_URL || "https://driptyard.vercel.app";
+                        let baseUrl = websiteUrl.endsWith('/') ? websiteUrl.slice(0, -1) : websiteUrl;
+                        if (!baseUrl.endsWith('/products')) {
+                          baseUrl = `${baseUrl}/products`;
+                        }
+                        const productUrl = editItem?.product_id ? `${baseUrl}/${editItem.product_id}` : null;
+                        if (productUrl) {
+                          window.open(productUrl, "_blank");
+                        }
+                      }}
+                      className="flex items-center gap-2"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                      View Listing
+                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setEditItem(null);
+                          setEditDuration("24");
+                          setEditCustomDate(null);
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={handleEdit}
+                        disabled={editLoading || (editDuration === "custom" && !editCustomDate)}
+                        className="border-[#E0B74F] bg-[#E0B74F] text-[#0B0B0D] hover:bg-[#E0B74F]/90"
+                      >
+                        {editLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                        Update Spotlight
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
+        )}
+
+        {/* Remove Spotlight Dialog */}
+        {canRemoveSpotlight && (
+          <AlertDialog open={!!removeItem} onOpenChange={() => setRemoveItem(null)}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Remove Spotlight?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to remove the spotlight for "{removeItem?.product_title || "this listing"}"? This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={removeLoading}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleRemove}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  disabled={removeLoading}
+                >
+                  {removeLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Remove
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
+
       </div>
     </AdminLayout>
   );

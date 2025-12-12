@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Button } from "@/components/ui/button";
@@ -32,17 +33,24 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { apiClient } from "@/lib/api-client";
 import { notifyError, notifySuccess } from "@/lib/toast";
 import { useAuth } from "@/hooks/use-auth";
+import { format } from "date-fns";
 
 function FlaggedContent() {
   const { user } = useAuth();
+  const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
   const [status, setStatus] = useState("all");
+  const [priceSort, setPriceSort] = useState("none");
+  const [reportCountSort, setReportCountSort] = useState("none");
   const [showFilters, setShowFilters] = useState(false);
   const [flaggedContent, setFlaggedContent] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingActions, setLoadingActions] = useState({});
   const [viewItem, setViewItem] = useState(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [viewUser, setViewUser] = useState(null);
+  const [isViewUserDialogOpen, setIsViewUserDialogOpen] = useState(false);
+  const [viewUserLoading, setViewUserLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
@@ -62,7 +70,7 @@ function FlaggedContent() {
     fetchFlaggedContent();
     // Clear selection when filters change
     setSelectedItems(new Set());
-  }, [currentPage, searchTerm, status]);
+  }, [currentPage, searchTerm, priceSort, reportCountSort]);
 
   const formatDate = (dateString) => {
     if (!dateString) return "Unknown date";
@@ -117,6 +125,48 @@ function FlaggedContent() {
     }
   };
 
+  const applySorting = (items) => {
+    // If no sorting is selected, return items as-is
+    if (priceSort === "none" && reportCountSort === "none") {
+      return items;
+    }
+
+    let sortedItems = [...items];
+
+    // Apply sorting based on priority: price first, then report count
+    sortedItems.sort((a, b) => {
+      // Primary sort: Price
+      if (priceSort === "low-to-high") {
+        const priceA = a.price || 0;
+        const priceB = b.price || 0;
+        if (priceA !== priceB) {
+          return priceA - priceB;
+        }
+      } else if (priceSort === "high-to-low") {
+        const priceA = a.price || 0;
+        const priceB = b.price || 0;
+        if (priceA !== priceB) {
+          return priceB - priceA;
+        }
+      }
+
+      // Secondary sort: Report Count (applies when prices are equal or price sort is not active)
+      if (reportCountSort === "low-to-high") {
+        const countA = a.reportCount || 0;
+        const countB = b.reportCount || 0;
+        return countA - countB;
+      } else if (reportCountSort === "high-to-low") {
+        const countA = a.reportCount || 0;
+        const countB = b.reportCount || 0;
+        return countB - countA;
+      }
+
+      return 0;
+    });
+
+    return sortedItems;
+  };
+
   const fetchFlaggedContent = async () => {
     try {
       setLoading(true);
@@ -126,22 +176,12 @@ function FlaggedContent() {
         search: searchTerm || undefined,
       };
 
-      if (status && status !== "all") {
-        params.status = status;
-      }
-
       const data = await apiClient.getAdminReports(params);
       let items = data.reports || [];
       
-      // Apply client-side status filtering if needed
-      if (status === "pending") {
-        items = items.filter((item) => (item.latest_report_status || "pending").toLowerCase() === "pending");
-      } else if (status === "approved") {
-        items = items.filter((item) => (item.latest_report_status || "").toLowerCase() === "approved");
-      }
-      
       const normalizedItems = items.map(normalizeFlaggedItem);
-      setFlaggedContent(normalizedItems);
+      const sortedItems = applySorting(normalizedItems);
+      setFlaggedContent(sortedItems);
       setTotalPages(data.total_pages || 1);
       setTotalCount(data.total || normalizedItems.length || 0);
       setPageSize(data.page_size || 10);
@@ -155,20 +195,48 @@ function FlaggedContent() {
 
   const handleClearFilters = () => {
     setSearchTerm("");
-    setStatus("all");
+    setPriceSort("none");
+    setReportCountSort("none");
     setCurrentPage(1);
   };
 
-  const STATUS_OPTIONS = [
-    { value: "all", label: "All Status" },
-    { value: "pending", label: "Pending" },
-    { value: "approved", label: "Approved" },
-  ];
-
-  const hasActiveFilters = searchTerm || (status && status !== "all");
+  const hasActiveFilters = searchTerm || priceSort !== "none" || reportCountSort !== "none";
 
   const getStatusBadgeVariant = (status) => {
     return STATUS_SUCCESS_STATES.includes((status || "").toLowerCase()) ? "success" : "destructive";
+  };
+
+  const getUserStatusBadgeVariant = (user) => {
+    if (user.is_banned || user.is_suspended || !user.is_active) {
+      return "destructive";
+    }
+    if (!user.is_verified) {
+      return "destructive";
+    }
+    return "success";
+  };
+
+  const getUserStatusText = (user) => {
+    if (user.is_banned) return "Inactive";
+    if (user.is_suspended) return "Suspended";
+    if (!user.is_active) return "Inactive";
+    if (!user.is_verified) return "Unverified";
+    return "Active";
+  };
+
+  const handleViewUser = async (userId) => {
+    try {
+      setViewUserLoading(true);
+      setIsViewUserDialogOpen(true);
+      const userDetails = await apiClient.getUserDetails(userId);
+      setViewUser(userDetails);
+    } catch (error) {
+      console.error("Failed to fetch user details:", error);
+      notifyError(error.response?.data?.detail || "Failed to load user details");
+      setIsViewUserDialogOpen(false);
+    } finally {
+      setViewUserLoading(false);
+    }
   };
 
   const handleApprove = async (item) => {
@@ -298,7 +366,7 @@ function FlaggedContent() {
               Filters
               {hasActiveFilters && (
                 <Badge variant="secondary" className="ml-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs">
-                  {[searchTerm, status && status !== "all" ? status : null].filter(Boolean).length}
+                  {[searchTerm, priceSort !== "none" ? "price" : null, reportCountSort !== "none" ? "reports" : null].filter(Boolean).length}
                 </Badge>
               )}
             </Button>
@@ -328,20 +396,34 @@ function FlaggedContent() {
                 />
               </div>
               <div className="space-y-2 w-full md:w-auto md:min-w-[200px]">
-                <Label htmlFor="status">Status</Label>
-                <Select value={status} onValueChange={(value) => {
-                  setStatus(value);
+                <Label htmlFor="priceSort">Sort by Price</Label>
+                <Select value={priceSort} onValueChange={(value) => {
+                  setPriceSort(value);
                   setCurrentPage(1);
                 }}>
-                  <SelectTrigger id="status">
-                    <SelectValue placeholder="Select status" />
+                  <SelectTrigger id="priceSort">
+                    <SelectValue placeholder="No sorting" />
                   </SelectTrigger>
                   <SelectContent>
-                    {STATUS_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
+                    <SelectItem value="none">No sorting</SelectItem>
+                    <SelectItem value="low-to-high">Low to High</SelectItem>
+                    <SelectItem value="high-to-low">High to Low</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2 w-full md:w-auto md:min-w-[200px]">
+                <Label htmlFor="reportCountSort">Sort by Reports</Label>
+                <Select value={reportCountSort} onValueChange={(value) => {
+                  setReportCountSort(value);
+                  setCurrentPage(1);
+                }}>
+                  <SelectTrigger id="reportCountSort">
+                    <SelectValue placeholder="No sorting" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No sorting</SelectItem>
+                    <SelectItem value="low-to-high">Low to High</SelectItem>
+                    <SelectItem value="high-to-low">High to Low</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -419,7 +501,6 @@ function FlaggedContent() {
                     <TableHead className="h-12 px-4 font-semibold text-secondary max-w-[250px]">Title</TableHead>
                     <TableHead className="h-12 px-4 font-semibold text-secondary max-w-[100px]">Price</TableHead>
                     <TableHead className="h-12 px-4 font-semibold text-secondary max-w-[100px]">Reports</TableHead>
-                    <TableHead className="h-12 px-4 font-semibold text-secondary max-w-[120px]">Status</TableHead>
                     <TableHead className="h-12 px-4 font-semibold text-secondary max-w-[150px]">Date</TableHead>
                     {canManageFlaggedContent && (
                       <TableHead className="h-12 px-4 text-right font-semibold text-secondary max-w-[100px]">Actions</TableHead>
@@ -435,8 +516,27 @@ function FlaggedContent() {
                       return null;
                     };
 
+                    const productId = item.productId;
+                    const websiteUrl = process.env.NEXT_PUBLIC_WEBSITE_URL || "https://driptyard.vercel.app";
+                    // Ensure proper URL construction with /products/ path
+                    let baseUrl = websiteUrl.endsWith('/') ? websiteUrl.slice(0, -1) : websiteUrl;
+                    if (!baseUrl.endsWith('/products')) {
+                      baseUrl = `${baseUrl}/products`;
+                    }
+                    const productUrl = productId ? `${baseUrl}/${productId}` : null;
+                    
+                    const handleRowClick = () => {
+                      if (productUrl) {
+                        window.open(productUrl, "_blank");
+                      }
+                    };
+
                     return (
-                      <TableRow key={item.id} className="hover:bg-muted/30 transition-colors">
+                      <TableRow 
+                        key={item.id} 
+                        className={`hover:bg-muted/30 transition-colors ${productUrl ? "cursor-pointer" : ""}`}
+                        onDoubleClick={productUrl ? handleRowClick : undefined}
+                      >
                         {canManageFlaggedContent && (
                           <TableCell className="py-3 px-4">
                             <Checkbox
@@ -461,7 +561,22 @@ function FlaggedContent() {
                           </div>
                         </TableCell>
                         <TableCell className="py-3 px-4 max-w-[250px]">
-                          <p className="font-semibold text-sm text-primary leading-tight break-words">{item.title}</p>
+                          {productUrl ? (
+                            <a 
+                              href={productUrl} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="font-semibold text-sm text-primary leading-tight break-words hover:text-accent transition-colors"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                window.open(productUrl, "_blank");
+                              }}
+                            >
+                              {item.title}
+                            </a>
+                          ) : (
+                            <p className="font-semibold text-sm text-primary leading-tight break-words">{item.title}</p>
+                          )}
                         </TableCell>
                         <TableCell className="py-3 px-4 max-w-[100px]">
                           {item.price ? (
@@ -474,11 +589,6 @@ function FlaggedContent() {
                           <p className="text-sm text-foreground">
                             {item.reportCount || 0} {item.reportCount === 1 ? 'Report' : 'Reports'}
                           </p>
-                        </TableCell>
-                        <TableCell className="py-3 px-4 max-w-[120px]">
-                          <Badge variant={getStatusBadgeVariant(item.status)} className="capitalize text-xs">
-                            {item.status}
-                          </Badge>
                         </TableCell>
                         <TableCell className="py-3 px-4 max-w-[150px]">
                           <p className="text-sm text-foreground">{item.date}</p>
@@ -646,44 +756,67 @@ function FlaggedContent() {
                   </div>
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="grid gap-2">
-                    <Label className="text-muted-foreground">Latest Report</Label>
-                    <p className="text-sm font-medium">{viewItem.latest_report_user_username || "N/A"}</p>
+                {/* All Reports Table */}
+                {viewItem.all_reports && viewItem.all_reports.length > 0 && (
+                  <div className="space-y-4 pt-4 border-t border-border">
+                    <Label className="text-base font-semibold text-secondary">All Reported Users</Label>
+                    <div className="rounded-lg border border-border overflow-hidden">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-muted/50 hover:bg-muted/50">
+                            <TableHead className="h-12 px-4 font-semibold text-secondary">Username</TableHead>
+                            <TableHead className="h-12 px-4 font-semibold text-secondary">Email</TableHead>
+                            <TableHead className="h-12 px-4 font-semibold text-secondary">Reason</TableHead>
+                            <TableHead className="h-12 px-4 font-semibold text-secondary">Status</TableHead>
+                            <TableHead className="h-12 px-4 font-semibold text-secondary">Created At</TableHead>
+                            <TableHead className="h-12 px-4 font-semibold text-secondary">Updated At</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {viewItem.all_reports.map((report) => (
+                            <TableRow key={report.id} className="hover:bg-muted/30 transition-colors">
+                              <TableCell className="py-3 px-4">
+                                <p 
+                                  className="text-sm font-medium text-primary hover:text-accent transition-colors cursor-pointer"
+                                  onClick={() => handleViewUser(report.user_id)}
+                                  title="Click to view user details"
+                                >
+                                  {report.user_username || "N/A"}
+                                </p>
+                              </TableCell>
+                              <TableCell className="py-3 px-4">
+                                <p className="text-sm text-foreground">{report.user_email || "N/A"}</p>
+                              </TableCell>
+                              <TableCell className="py-3 px-4">
+                                <p className="text-sm text-foreground break-words max-w-[200px]">
+                                  {report.reason || "No reason provided"}
+                                </p>
+                              </TableCell>
+                              <TableCell className="py-3 px-4">
+                                <Badge 
+                                  variant={getStatusBadgeVariant(report.status)} 
+                                  className="capitalize text-xs"
+                                >
+                                  {report.status || "N/A"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="py-3 px-4">
+                                <p className="text-sm text-foreground">
+                                  {report.created_at ? formatDateTime(report.created_at) : "N/A"}
+                                </p>
+                              </TableCell>
+                              <TableCell className="py-3 px-4">
+                                <p className="text-sm text-foreground">
+                                  {report.updated_at ? formatDateTime(report.updated_at) : "N/A"}
+                                </p>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
                   </div>
-                  <div className="grid gap-2">
-                    <Label className="text-muted-foreground">Report Status</Label>
-                    <Badge variant={getStatusBadgeVariant(viewItem.latest_report_status)} className="capitalize text-xs w-fit">
-                      {viewItem.latest_report_status || "N/A"}
-                    </Badge>
-                  </div>
-                </div>
-
-                <div className="grid gap-2">
-                  <Label className="text-muted-foreground">Report Reason</Label>
-                  <p className="text-sm bg-muted/50 p-3 rounded-lg border border-border">
-                    {viewItem.latest_report_reason || "No reason provided"}
-                  </p>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="grid gap-2">
-                    <Label className="text-muted-foreground">Latest Report Created At</Label>
-                    <p className="text-sm font-medium">
-                      {viewItem.latest_report_created_at 
-                        ? formatDateTime(viewItem.latest_report_created_at) 
-                        : "N/A"}
-                    </p>
-                  </div>
-                  <div className="grid gap-2">
-                    <Label className="text-muted-foreground">First Reported At</Label>
-                    <p className="text-sm font-medium">
-                      {viewItem.first_reported_at 
-                        ? formatDateTime(viewItem.first_reported_at) 
-                        : "N/A"}
-                    </p>
-                  </div>
-                </div>
+                )}
 
                 <div className="flex justify-end gap-2 pt-4 border-t border-border">
                   <Button
@@ -749,6 +882,108 @@ function FlaggedContent() {
             </AlertDialogContent>
           </AlertDialog>
         )}
+
+        {/* View User Details Dialog */}
+        <Dialog open={isViewUserDialogOpen} onOpenChange={setIsViewUserDialogOpen}>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>User Details</DialogTitle>
+            </DialogHeader>
+            {viewUserLoading ? (
+              <div className="space-y-4 py-8">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <Skeleton key={i} className="h-12 w-full" />
+                ))}
+              </div>
+            ) : viewUser ? (
+              <div className="space-y-6 py-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="grid gap-2">
+                    <Label className="text-muted-foreground">Username</Label>
+                    <p className="text-sm font-medium">{viewUser.username || "N/A"}</p>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label className="text-muted-foreground">Email</Label>
+                    <p className="text-sm font-medium">{viewUser.email || "N/A"}</p>
+                  </div>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="grid gap-2">
+                    <Label className="text-muted-foreground">First Name</Label>
+                    <p className="text-sm font-medium">{viewUser.first_name || "N/A"}</p>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label className="text-muted-foreground">Last Name</Label>
+                    <p className="text-sm font-medium">{viewUser.last_name || "N/A"}</p>
+                  </div>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="grid gap-2">
+                    <Label className="text-muted-foreground">Phone</Label>
+                    <p className="text-sm font-medium">{viewUser.phone || "N/A"}</p>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label className="text-muted-foreground">Listings Count</Label>
+                    <p className="text-sm font-medium">{viewUser.listings_count || 0}</p>
+                  </div>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="grid gap-2">
+                    <Label className="text-muted-foreground">Status</Label>
+                    <Badge variant={getUserStatusBadgeVariant(viewUser)} className="text-xs w-fit">
+                      {getUserStatusText(viewUser)}
+                    </Badge>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label className="text-muted-foreground">Verified</Label>
+                    <Badge variant={viewUser.is_verified ? "success" : "destructive"} className="text-xs w-fit">
+                      {viewUser.is_verified ? "Verified" : "Unverified"}
+                    </Badge>
+                  </div>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="grid gap-2">
+                    <Label className="text-muted-foreground">Joined Date</Label>
+                    <p className="text-sm font-medium">
+                      {viewUser.created_at ? format(new Date(viewUser.created_at), "MMM dd, yyyy HH:mm") : "N/A"}
+                    </p>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label className="text-muted-foreground">Last Updated</Label>
+                    <p className="text-sm font-medium">
+                      {viewUser.updated_at ? format(new Date(viewUser.updated_at), "MMM dd, yyyy HH:mm") : "N/A"}
+                    </p>
+                  </div>
+                </div>
+                {viewUser.bio && (
+                  <div className="grid gap-2">
+                    <Label className="text-muted-foreground">Bio</Label>
+                    <p className="text-sm">{viewUser.bio}</p>
+                  </div>
+                )}
+                <div className="flex justify-end gap-2 pt-4 border-t border-border">
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsViewUserDialogOpen(false)}
+                  >
+                    Close
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setIsViewUserDialogOpen(false);
+                      router.push("/admin/users");
+                    }}
+                    className="gradient-driptyard-hover text-white"
+                  >
+                    View in Customers Page
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground py-4">No user data available</p>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </AdminLayout>
   );

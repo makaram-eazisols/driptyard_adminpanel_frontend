@@ -44,6 +44,8 @@ function Users() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [status, setStatus] = useState("all");
+  const [joinDateSort, setJoinDateSort] = useState("none");
+  const [listingsSort, setListingsSort] = useState("none");
   const [showFilters, setShowFilters] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -94,7 +96,7 @@ function Users() {
     fetchUsers();
     // Clear selection when filters change
     setSelectedUsers(new Set());
-  }, [currentPage, searchTerm, status]);
+  }, [currentPage, searchTerm, status, joinDateSort, listingsSort]);
 
   const fetchUsers = async () => {
     try {
@@ -129,7 +131,9 @@ function Users() {
         customerUsers = customerUsers.filter((user) => user.is_suspended);
       }
       
-      setUsers(customerUsers);
+      // Apply sorting
+      const sortedUsers = applySorting(customerUsers);
+      setUsers(sortedUsers);
       setTotalPages(data.total_pages || 1);
       setTotalCount(data.total || customerUsers.length || 0);
       setPageSize(data.page_size || 10);
@@ -141,9 +145,57 @@ function Users() {
     }
   };
 
+  const applySorting = (items) => {
+    // If no sorting is selected, return items as-is
+    if (joinDateSort === "none" && listingsSort === "none") {
+      return items;
+    }
+
+    let sortedItems = [...items];
+
+    // Apply sorting based on priority: join date first, then listings count
+    sortedItems.sort((a, b) => {
+      // Primary sort: Join Date
+      if (joinDateSort === "most-recent") {
+        const dateA = new Date(a.created_at || 0).getTime();
+        const dateB = new Date(b.created_at || 0).getTime();
+        if (dateA !== dateB) {
+          return dateB - dateA; // Most recent first
+        }
+      } else if (joinDateSort === "least-recent") {
+        const dateA = new Date(a.created_at || 0).getTime();
+        const dateB = new Date(b.created_at || 0).getTime();
+        if (dateA !== dateB) {
+          return dateA - dateB; // Least recent first
+        }
+      }
+
+      // Secondary sort: Listings Count (applies when dates are equal or join date sort is not active)
+      if (listingsSort === "most") {
+        const countA = a.listings_count || 0;
+        const countB = b.listings_count || 0;
+        if (countA !== countB) {
+          return countB - countA; // Most listings first
+        }
+      } else if (listingsSort === "least") {
+        const countA = a.listings_count || 0;
+        const countB = b.listings_count || 0;
+        if (countA !== countB) {
+          return countA - countB; // Least listings first
+        }
+      }
+
+      return 0;
+    });
+
+    return sortedItems;
+  };
+
   const handleClearFilters = () => {
     setSearchTerm("");
     setStatus("all");
+    setJoinDateSort("none");
+    setListingsSort("none");
     setCurrentPage(1);
   };
 
@@ -154,7 +206,7 @@ function Users() {
     { value: "isSuspend", label: "Suspended" },
   ];
 
-  const hasActiveFilters = searchTerm || (status && status !== "all");
+  const hasActiveFilters = searchTerm || (status && status !== "all") || joinDateSort !== "none" || listingsSort !== "none";
 
   const handleEditUser = async (user) => {
     setEditUser({ ...user });
@@ -623,7 +675,7 @@ function Users() {
               Filters
               {hasActiveFilters && (
                 <Badge variant="secondary" className="ml-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs">
-                  {[searchTerm, status && status !== "all" ? status : null].filter(Boolean).length}
+                  {[searchTerm, status && status !== "all" ? status : null, joinDateSort !== "none" ? "join" : null, listingsSort !== "none" ? "listings" : null].filter(Boolean).length}
                 </Badge>
               )}
             </Button>
@@ -676,6 +728,38 @@ function Users() {
                         {option.label}
                       </SelectItem>
                     ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2 w-full md:w-auto md:min-w-[200px]">
+                <Label htmlFor="joinDateSort">Sort by Join Date</Label>
+                <Select value={joinDateSort} onValueChange={(value) => {
+                  setJoinDateSort(value);
+                  setCurrentPage(1);
+                }}>
+                  <SelectTrigger id="joinDateSort">
+                    <SelectValue placeholder="No sorting" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No sorting</SelectItem>
+                    <SelectItem value="most-recent">Most Recent</SelectItem>
+                    <SelectItem value="least-recent">Least Recent</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2 w-full md:w-auto md:min-w-[200px]">
+                <Label htmlFor="listingsSort">Sort by Listings</Label>
+                <Select value={listingsSort} onValueChange={(value) => {
+                  setListingsSort(value);
+                  setCurrentPage(1);
+                }}>
+                  <SelectTrigger id="listingsSort">
+                    <SelectValue placeholder="No sorting" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No sorting</SelectItem>
+                    <SelectItem value="most">Most Listings</SelectItem>
+                    <SelectItem value="least">Least Listings</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

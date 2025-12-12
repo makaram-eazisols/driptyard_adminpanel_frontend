@@ -52,6 +52,7 @@ function Products() {
   const [searchQuery, setSearchQuery] = useState("");
   const [status, setStatus] = useState("all");
   const [verification, setVerification] = useState("all");
+  const [sortOrder, setSortOrder] = useState("none");
   const [showFilters, setShowFilters] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -74,6 +75,13 @@ function Products() {
   const [bulkStatusValue, setBulkStatusValue] = useState("active");
   const [bulkVerificationValue, setBulkVerificationValue] = useState("verified");
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
+  const [bulkSpotlightDialog, setBulkSpotlightDialog] = useState(false);
+  const [bulkSpotlightDuration, setBulkSpotlightDuration] = useState("24");
+  const [bulkSpotlightCustomDate, setBulkSpotlightCustomDate] = useState(null);
+  const [bulkEditSpotlightDialog, setBulkEditSpotlightDialog] = useState(false);
+  const [bulkEditSpotlightDuration, setBulkEditSpotlightDuration] = useState("24");
+  const [bulkEditSpotlightCustomDate, setBulkEditSpotlightCustomDate] = useState(null);
+  const [bulkRemoveSpotlightDialog, setBulkRemoveSpotlightDialog] = useState(false);
 
   // Check spotlight permissions
   const canSpotlight = user?.is_admin || user?.permissions?.can_spotlight === true;
@@ -138,6 +146,7 @@ function Products() {
     setSearchQuery("");
     setStatus("all");
     setVerification("all");
+    setSortOrder("none");
     setPage(1);
   };
 
@@ -153,7 +162,34 @@ function Products() {
     { value: "unverified", label: "Unverified" },
   ];
 
-  const hasActiveFilters = searchQuery || (status && status !== "all") || (verification && verification !== "all");
+  const SORT_OPTIONS = [
+    { value: "none", label: "No Sort" },
+    { value: "low-to-high", label: "Price: Low to High" },
+    { value: "high-to-low", label: "Price: High to Low" },
+  ];
+
+  const hasActiveFilters = searchQuery || (status && status !== "all") || (verification && verification !== "all") || (sortOrder && sortOrder !== "none");
+
+  // Sort products by price
+  const getSortedProducts = (productsList) => {
+    if (sortOrder === "none") {
+      return productsList;
+    }
+
+    const sorted = [...productsList].sort((a, b) => {
+      const priceA = Number(a.price) || 0;
+      const priceB = Number(b.price) || 0;
+
+      if (sortOrder === "low-to-high") {
+        return priceA - priceB;
+      } else if (sortOrder === "high-to-low") {
+        return priceB - priceA;
+      }
+      return 0;
+    });
+
+    return sorted;
+  };
 
   useEffect(() => {
     fetchProducts();
@@ -375,6 +411,99 @@ function Products() {
     }
   };
 
+  const handleBulkSpotlight = async () => {
+    if (selectedProducts.size === 0) return;
+
+    setBulkActionLoading(true);
+    try {
+      const productIds = Array.from(selectedProducts).map(id => parseInt(id, 10));
+      let requestData = {};
+
+      if (bulkSpotlightDuration === "custom" && bulkSpotlightCustomDate) {
+        const now = new Date();
+        const selectedDate = new Date(bulkSpotlightCustomDate);
+        if (selectedDate > now) {
+          requestData.custom_end_time = selectedDate.toISOString();
+        } else {
+          notifyError("Custom date must be in the future");
+          setBulkActionLoading(false);
+          return;
+        }
+      } else {
+        requestData.duration_hours = parseInt(bulkSpotlightDuration);
+      }
+
+      const response = await apiClient.bulkAddProductsToSpotlight(productIds, requestData);
+      notifySuccess(response.message || `${selectedProducts.size} product(s) added to spotlight successfully`);
+      setSelectedProducts(new Set());
+      setBulkSpotlightDialog(false);
+      setBulkSpotlightDuration("24");
+      setBulkSpotlightCustomDate(null);
+      fetchProducts();
+    } catch (error) {
+      console.error("Failed to add products to spotlight:", error);
+      notifyError(error.response?.data?.detail || "Failed to add products to spotlight");
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
+  const handleBulkEditSpotlight = async () => {
+    if (selectedProducts.size === 0) return;
+
+    setBulkActionLoading(true);
+    try {
+      const productIds = Array.from(selectedProducts).map(id => parseInt(id, 10));
+      let requestData = {};
+
+      if (bulkEditSpotlightDuration === "custom" && bulkEditSpotlightCustomDate) {
+        const now = new Date();
+        const selectedDate = new Date(bulkEditSpotlightCustomDate);
+        if (selectedDate > now) {
+          requestData.custom_end_time = selectedDate.toISOString();
+        } else {
+          notifyError("Custom date must be in the future");
+          setBulkActionLoading(false);
+          return;
+        }
+      } else {
+        requestData.duration_hours = parseInt(bulkEditSpotlightDuration);
+      }
+
+      const response = await apiClient.bulkEditProductsSpotlight(productIds, requestData);
+      notifySuccess(response.message || `${selectedProducts.size} spotlight(s) updated successfully`);
+      setSelectedProducts(new Set());
+      setBulkEditSpotlightDialog(false);
+      setBulkEditSpotlightDuration("24");
+      setBulkEditSpotlightCustomDate(null);
+      fetchProducts();
+    } catch (error) {
+      console.error("Failed to edit spotlights:", error);
+      notifyError(error.response?.data?.detail || "Failed to edit spotlights");
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
+  const handleBulkRemoveSpotlight = async () => {
+    if (selectedProducts.size === 0) return;
+
+    setBulkActionLoading(true);
+    try {
+      const productIds = Array.from(selectedProducts).map(id => parseInt(id, 10));
+      const response = await apiClient.bulkRemoveProductsSpotlight(productIds);
+      notifySuccess(response.message || `${selectedProducts.size} spotlight(s) removed successfully`);
+      setSelectedProducts(new Set());
+      setBulkRemoveSpotlightDialog(false);
+      fetchProducts();
+    } catch (error) {
+      console.error("Failed to remove spotlights:", error);
+      notifyError(error.response?.data?.detail || "Failed to remove spotlights");
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
 const getPrimaryImage = (product) => {
   if (Array.isArray(product.images) && product.images.length > 0) {
     return product.images[0];
@@ -435,7 +564,7 @@ const formatPrice = (value) => {
               Filters
               {hasActiveFilters && (
                 <Badge variant="secondary" className="ml-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs">
-                  {[searchQuery, status && status !== "all" ? status : null, verification && verification !== "all" ? verification : null].filter(Boolean).length}
+                  {[searchQuery, status && status !== "all" ? status : null, verification && verification !== "all" ? verification : null, sortOrder && sortOrder !== "none" ? sortOrder : null].filter(Boolean).length}
                 </Badge>
               )}
             </Button>
@@ -500,6 +629,24 @@ const formatPrice = (value) => {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="space-y-2 w-full md:w-auto md:min-w-[200px]">
+                <Label htmlFor="sort">Sort by Price</Label>
+                <Select value={sortOrder} onValueChange={(value) => {
+                  setSortOrder(value);
+                  setPage(1);
+                }}>
+                  <SelectTrigger id="sort">
+                    <SelectValue placeholder="Select sort order" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SORT_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
         )}
@@ -518,7 +665,7 @@ const formatPrice = (value) => {
             ) : (
               <>
                 {/* Bulk Action Toolbar */}
-                {canManageListings && selectedProducts.size > 0 && (
+                {(canManageListings || canSpotlight) && selectedProducts.size > 0 && (
                   <div className="flex items-center justify-between rounded-lg border border-border bg-muted/50 p-4">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium text-primary">
@@ -526,31 +673,70 @@ const formatPrice = (value) => {
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setBulkStatusDialog(true)}
-                        disabled={bulkActionLoading}
-                      >
-                        Change Status
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setBulkVerificationDialog(true)}
-                        disabled={bulkActionLoading}
-                      >
-                        Change Verification
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => setBulkDeleteDialog(true)}
-                        disabled={bulkActionLoading}
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Delete
-                      </Button>
+                      {canManageListings && (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setBulkStatusDialog(true)}
+                            disabled={bulkActionLoading}
+                          >
+                            Change Status
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setBulkVerificationDialog(true)}
+                            disabled={bulkActionLoading}
+                          >
+                            Change Verification
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => setBulkDeleteDialog(true)}
+                            disabled={bulkActionLoading}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </Button>
+                        </>
+                      )}
+                      {canSpotlight && (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setBulkSpotlightDialog(true)}
+                            disabled={bulkActionLoading}
+                            className="border-[#E0B74F] text-[#E0B74F] hover:bg-[#E0B74F] hover:text-white"
+                          >
+                            <Star className="h-4 w-4 mr-2" />
+                            Add Spotlight
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setBulkEditSpotlightDialog(true)}
+                            disabled={bulkActionLoading}
+                            className="border-[#E0B74F] text-[#E0B74F] hover:bg-[#E0B74F] hover:text-white"
+                          >
+                            <Edit2 className="h-4 w-4 mr-2" />
+                            Edit Spotlight
+                          </Button>
+                        </>
+                      )}
+                      {canRemoveSpotlight && (
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => setBulkRemoveSpotlightDialog(true)}
+                          disabled={bulkActionLoading}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Remove Spotlight
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="sm"
@@ -568,7 +754,7 @@ const formatPrice = (value) => {
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-muted/50 hover:bg-muted/50">
-                        {canManageListings && (
+                        {(canManageListings || canSpotlight) && (
                           <TableHead className="h-12 px-4 w-12">
                             <Checkbox
                               checked={isAllSelected}
@@ -588,7 +774,7 @@ const formatPrice = (value) => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {products.map((product) => {
+                      {getSortedProducts(products).map((product) => {
                         const image = getPrimaryImage(product);
                         const authBadge = getAuthBadge(product);
                         const productId = product.id;
@@ -612,7 +798,7 @@ const formatPrice = (value) => {
                             className={`hover:bg-muted/30 transition-colors ${productUrl ? "cursor-pointer" : ""}`}
                             onDoubleClick={productUrl ? handleRowClick : undefined}
                           >
-                            {canManageListings && (
+                            {(canManageListings || canSpotlight) && (
                               <TableCell className="py-3 px-4">
                                 <Checkbox
                                   checked={selectedProducts.has(product.id)}
@@ -1296,6 +1482,391 @@ const formatPrice = (value) => {
             </div>
           </DialogContent>
         </Dialog>
+      )}
+
+      {/* Bulk Spotlight Dialog */}
+      {canSpotlight && (
+        <Dialog open={bulkSpotlightDialog} onOpenChange={(open) => {
+          setBulkSpotlightDialog(open);
+          if (!open) {
+            setBulkSpotlightDuration("24");
+            setBulkSpotlightCustomDate(null);
+          }
+        }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Add {selectedProducts.size} Product(s) to Spotlight</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-4">
+                <Label className="text-base font-semibold">Choose Spotlight Duration</Label>
+                <RadioGroup value={bulkSpotlightDuration} onValueChange={setBulkSpotlightDuration} className="flex flex-wrap gap-6 mt-2">
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="24" id="bulk-24h" />
+                    <Label htmlFor="bulk-24h" className="cursor-pointer font-normal">24 Hours</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="72" id="bulk-3d" />
+                    <Label htmlFor="bulk-3d" className="cursor-pointer font-normal">3 Days</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="168" id="bulk-7d" />
+                    <Label htmlFor="bulk-7d" className="cursor-pointer font-normal">7 Days</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="custom" id="bulk-custom" />
+                    <Label htmlFor="bulk-custom" className="cursor-pointer font-normal">Custom</Label>
+                  </div>
+                </RadioGroup>
+                {bulkSpotlightDuration === "custom" && (
+                  <div className="mt-4 space-y-3">
+                    <div className="space-y-2">
+                      <Label>Select Date</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className="w-full justify-start text-left font-normal border border-border bg-background hover:border-[#E0B74F] hover:bg-background transition-colors"
+                          >
+                            {bulkSpotlightCustomDate ? (
+                              new Date(bulkSpotlightCustomDate).toLocaleDateString()
+                            ) : (
+                              <span className="text-muted-foreground">Pick a date</span>
+                            )}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={bulkSpotlightCustomDate}
+                            onSelect={(date) => {
+                              if (date) {
+                                const newDate = new Date(date);
+                                if (bulkSpotlightCustomDate) {
+                                  newDate.setHours(bulkSpotlightCustomDate.getHours(), bulkSpotlightCustomDate.getMinutes());
+                                } else {
+                                  newDate.setHours(23, 59);
+                                }
+                                setBulkSpotlightCustomDate(newDate);
+                              } else {
+                                setBulkSpotlightCustomDate(null);
+                              }
+                            }}
+                            disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    {bulkSpotlightCustomDate && (
+                      <div className="space-y-2">
+                        <Label>Select Time</Label>
+                        <div className="flex items-center gap-2">
+                          <Select
+                            value={bulkSpotlightCustomDate ? String(new Date(bulkSpotlightCustomDate).getHours() % 12 || 12) : "1"}
+                            onValueChange={(value) => {
+                              if (bulkSpotlightCustomDate) {
+                                const newDate = new Date(bulkSpotlightCustomDate);
+                                const currentHours = newDate.getHours();
+                                const isPM = currentHours >= 12;
+                                const newHours = isPM ? parseInt(value) + 12 : parseInt(value);
+                                newDate.setHours(newHours % 24, newDate.getMinutes());
+                                setBulkSpotlightCustomDate(newDate);
+                              }
+                            }}
+                          >
+                            <SelectTrigger className="w-20">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Array.from({ length: 12 }, (_, i) => (
+                                <SelectItem key={i + 1} value={String(i + 1)}>
+                                  {i + 1}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <span className="text-muted-foreground">:</span>
+                          <Select
+                            value={bulkSpotlightCustomDate ? String(new Date(bulkSpotlightCustomDate).getMinutes()).padStart(2, "0") : "00"}
+                            onValueChange={(value) => {
+                              if (bulkSpotlightCustomDate) {
+                                const newDate = new Date(bulkSpotlightCustomDate);
+                                newDate.setMinutes(parseInt(value));
+                                setBulkSpotlightCustomDate(newDate);
+                              }
+                            }}
+                          >
+                            <SelectTrigger className="w-20">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Array.from({ length: 60 }, (_, i) => {
+                                const minutes = String(i).padStart(2, "0");
+                                return (
+                                  <SelectItem key={minutes} value={minutes}>
+                                    {minutes}
+                                  </SelectItem>
+                                );
+                              })}
+                            </SelectContent>
+                          </Select>
+                          <Select
+                            value={bulkSpotlightCustomDate ? (new Date(bulkSpotlightCustomDate).getHours() >= 12 ? "PM" : "AM") : "AM"}
+                            onValueChange={(value) => {
+                              if (bulkSpotlightCustomDate) {
+                                const newDate = new Date(bulkSpotlightCustomDate);
+                                const currentHours = newDate.getHours();
+                                const hours12 = currentHours % 12 || 12;
+                                const newHours = value === "PM" ? hours12 + 12 : hours12;
+                                newDate.setHours(newHours % 24, newDate.getMinutes());
+                                setBulkSpotlightCustomDate(newDate);
+                              }
+                            }}
+                          >
+                            <SelectTrigger className="w-20">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="AM">AM</SelectItem>
+                              <SelectItem value="PM">PM</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-4 border-t border-border">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setBulkSpotlightDialog(false);
+                  setBulkSpotlightDuration("24");
+                  setBulkSpotlightCustomDate(null);
+                }}
+                disabled={bulkActionLoading}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleBulkSpotlight}
+                className="gradient-driptyard-hover text-white"
+                disabled={bulkActionLoading || (bulkSpotlightDuration === "custom" && !bulkSpotlightCustomDate)}
+              >
+                {bulkActionLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Apply Spotlight
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Bulk Edit Spotlight Dialog */}
+      {canSpotlight && (
+        <Dialog open={bulkEditSpotlightDialog} onOpenChange={(open) => {
+          setBulkEditSpotlightDialog(open);
+          if (!open) {
+            setBulkEditSpotlightDuration("24");
+            setBulkEditSpotlightCustomDate(null);
+          }
+        }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Edit {selectedProducts.size} Spotlight(s)</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-4">
+                <Label className="text-base font-semibold">Choose New Spotlight Duration</Label>
+                <RadioGroup value={bulkEditSpotlightDuration} onValueChange={setBulkEditSpotlightDuration} className="flex flex-wrap gap-6 mt-2">
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="24" id="bulk-edit-24h" />
+                    <Label htmlFor="bulk-edit-24h" className="cursor-pointer font-normal">24 Hours</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="72" id="bulk-edit-3d" />
+                    <Label htmlFor="bulk-edit-3d" className="cursor-pointer font-normal">3 Days</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="168" id="bulk-edit-7d" />
+                    <Label htmlFor="bulk-edit-7d" className="cursor-pointer font-normal">7 Days</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="custom" id="bulk-edit-custom" />
+                    <Label htmlFor="bulk-edit-custom" className="cursor-pointer font-normal">Custom</Label>
+                  </div>
+                </RadioGroup>
+                {bulkEditSpotlightDuration === "custom" && (
+                  <div className="mt-4 space-y-3">
+                    <div className="space-y-2">
+                      <Label>Select Date</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className="w-full justify-start text-left font-normal border border-border bg-background hover:border-[#E0B74F] hover:bg-background transition-colors"
+                          >
+                            {bulkEditSpotlightCustomDate ? (
+                              new Date(bulkEditSpotlightCustomDate).toLocaleDateString()
+                            ) : (
+                              <span className="text-muted-foreground">Pick a date</span>
+                            )}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={bulkEditSpotlightCustomDate}
+                            onSelect={(date) => {
+                              if (date) {
+                                const newDate = new Date(date);
+                                if (bulkEditSpotlightCustomDate) {
+                                  newDate.setHours(bulkEditSpotlightCustomDate.getHours(), bulkEditSpotlightCustomDate.getMinutes());
+                                } else {
+                                  newDate.setHours(23, 59);
+                                }
+                                setBulkEditSpotlightCustomDate(newDate);
+                              } else {
+                                setBulkEditSpotlightCustomDate(null);
+                              }
+                            }}
+                            disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    {bulkEditSpotlightCustomDate && (
+                      <div className="space-y-2">
+                        <Label>Select Time</Label>
+                        <div className="flex items-center gap-2">
+                          <Select
+                            value={bulkEditSpotlightCustomDate ? String(new Date(bulkEditSpotlightCustomDate).getHours() % 12 || 12) : "1"}
+                            onValueChange={(value) => {
+                              if (bulkEditSpotlightCustomDate) {
+                                const newDate = new Date(bulkEditSpotlightCustomDate);
+                                const currentHours = newDate.getHours();
+                                const isPM = currentHours >= 12;
+                                const newHours = isPM ? parseInt(value) + 12 : parseInt(value);
+                                newDate.setHours(newHours % 24, newDate.getMinutes());
+                                setBulkEditSpotlightCustomDate(newDate);
+                              }
+                            }}
+                          >
+                            <SelectTrigger className="w-20">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Array.from({ length: 12 }, (_, i) => (
+                                <SelectItem key={i + 1} value={String(i + 1)}>
+                                  {i + 1}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <span className="text-muted-foreground">:</span>
+                          <Select
+                            value={bulkEditSpotlightCustomDate ? String(new Date(bulkEditSpotlightCustomDate).getMinutes()).padStart(2, "0") : "00"}
+                            onValueChange={(value) => {
+                              if (bulkEditSpotlightCustomDate) {
+                                const newDate = new Date(bulkEditSpotlightCustomDate);
+                                newDate.setMinutes(parseInt(value));
+                                setBulkEditSpotlightCustomDate(newDate);
+                              }
+                            }}
+                          >
+                            <SelectTrigger className="w-20">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Array.from({ length: 60 }, (_, i) => {
+                                const minutes = String(i).padStart(2, "0");
+                                return (
+                                  <SelectItem key={minutes} value={minutes}>
+                                    {minutes}
+                                  </SelectItem>
+                                );
+                              })}
+                            </SelectContent>
+                          </Select>
+                          <Select
+                            value={bulkEditSpotlightCustomDate ? (new Date(bulkEditSpotlightCustomDate).getHours() >= 12 ? "PM" : "AM") : "AM"}
+                            onValueChange={(value) => {
+                              if (bulkEditSpotlightCustomDate) {
+                                const newDate = new Date(bulkEditSpotlightCustomDate);
+                                const currentHours = newDate.getHours();
+                                const hours12 = currentHours % 12 || 12;
+                                const newHours = value === "PM" ? hours12 + 12 : hours12;
+                                newDate.setHours(newHours % 24, newDate.getMinutes());
+                                setBulkEditSpotlightCustomDate(newDate);
+                              }
+                            }}
+                          >
+                            <SelectTrigger className="w-20">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="AM">AM</SelectItem>
+                              <SelectItem value="PM">PM</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-4 border-t border-border">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setBulkEditSpotlightDialog(false);
+                  setBulkEditSpotlightDuration("24");
+                  setBulkEditSpotlightCustomDate(null);
+                }}
+                disabled={bulkActionLoading}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleBulkEditSpotlight}
+                className="border-[#E0B74F] bg-[#E0B74F] text-[#0B0B0D] hover:bg-[#E0B74F]/90"
+                disabled={bulkActionLoading || (bulkEditSpotlightDuration === "custom" && !bulkEditSpotlightCustomDate)}
+              >
+                {bulkActionLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Update Spotlights
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Bulk Remove Spotlight Dialog */}
+      {canRemoveSpotlight && (
+        <AlertDialog open={bulkRemoveSpotlightDialog} onOpenChange={setBulkRemoveSpotlightDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Remove {selectedProducts.size} Spotlight(s)?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to remove {selectedProducts.size} selected spotlight(s)? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={bulkActionLoading}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleBulkRemoveSpotlight}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                disabled={bulkActionLoading}
+              >
+                {bulkActionLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Remove
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       )}
     </AdminLayout>
   );
