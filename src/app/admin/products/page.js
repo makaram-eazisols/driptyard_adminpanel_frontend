@@ -238,6 +238,25 @@ function Products() {
     }
   };
 
+  const handleQuickDisable = async (productId) => {
+    try {
+      const product = products.find(p => p.id === productId);
+      if (!product) return;
+      
+      await apiClient.updateAdminProduct(productId, {
+        title: product.title,
+        price: Number(product.price) || 0,
+        condition: product.condition,
+        is_active: false,
+        is_verified: product.is_verified,
+      });
+      notifySuccess("Product disabled successfully");
+      fetchProducts();
+    } catch (error) {
+      notifyError("Failed to disable product");
+    }
+  };
+
   const fetchSpotlightData = async (productId) => {
     try {
       setFetchingSpotlight(true);
@@ -350,6 +369,48 @@ function Products() {
 
   const isAllSelected = products.length > 0 && selectedProducts.size === products.length;
   const isIndeterminate = selectedProducts.size > 0 && selectedProducts.size < products.length;
+
+  // Check if all selected products are verified
+  const areAllSelectedVerified = () => {
+    if (selectedProducts.size === 0) return false;
+    const selectedProductsList = products.filter(p => selectedProducts.has(p.id));
+    return selectedProductsList.length > 0 && selectedProductsList.every(p => p.is_verified);
+  };
+
+  // Check if all selected products are unverified
+  const areAllSelectedUnverified = () => {
+    if (selectedProducts.size === 0) return false;
+    const selectedProductsList = products.filter(p => selectedProducts.has(p.id));
+    return selectedProductsList.length > 0 && selectedProductsList.every(p => !p.is_verified);
+  };
+
+  // Check if all selected products are active
+  const areAllSelectedActive = () => {
+    if (selectedProducts.size === 0) return false;
+    const selectedProductsList = products.filter(p => selectedProducts.has(p.id));
+    return selectedProductsList.length > 0 && selectedProductsList.every(p => p.is_active);
+  };
+
+  // Check if all selected products are inactive
+  const areAllSelectedInactive = () => {
+    if (selectedProducts.size === 0) return false;
+    const selectedProductsList = products.filter(p => selectedProducts.has(p.id));
+    return selectedProductsList.length > 0 && selectedProductsList.every(p => !p.is_active);
+  };
+
+  // Check if all selected products are spotlighted
+  const areAllSelectedSpotlighted = () => {
+    if (selectedProducts.size === 0) return false;
+    const selectedProductsList = products.filter(p => selectedProducts.has(p.id));
+    return selectedProductsList.length > 0 && selectedProductsList.every(p => p.is_spotlighted);
+  };
+
+  // Check if any selected products are not spotlighted
+  const areAnySelectedNotSpotlighted = () => {
+    if (selectedProducts.size === 0) return false;
+    const selectedProductsList = products.filter(p => selectedProducts.has(p.id));
+    return selectedProductsList.length > 0 && selectedProductsList.some(p => !p.is_spotlighted);
+  };
 
   // Bulk action handlers
   const handleBulkDelete = async () => {
@@ -708,7 +769,7 @@ const formatPrice = (value) => {
                             variant="outline"
                             size="sm"
                             onClick={() => setBulkSpotlightDialog(true)}
-                            disabled={bulkActionLoading}
+                            disabled={bulkActionLoading || areAllSelectedSpotlighted()}
                             className="border-[#E0B74F] text-[#E0B74F] hover:bg-[#E0B74F] hover:text-white"
                           >
                             <Star className="h-4 w-4 mr-2" />
@@ -718,7 +779,7 @@ const formatPrice = (value) => {
                             variant="outline"
                             size="sm"
                             onClick={() => setBulkEditSpotlightDialog(true)}
-                            disabled={bulkActionLoading}
+                            disabled={bulkActionLoading || areAnySelectedNotSpotlighted()}
                             className="border-[#E0B74F] text-[#E0B74F] hover:bg-[#E0B74F] hover:text-white"
                           >
                             <Edit2 className="h-4 w-4 mr-2" />
@@ -731,7 +792,7 @@ const formatPrice = (value) => {
                           variant="destructive"
                           size="sm"
                           onClick={() => setBulkRemoveSpotlightDialog(true)}
-                          disabled={bulkActionLoading}
+                          disabled={bulkActionLoading || areAnySelectedNotSpotlighted()}
                         >
                           <Trash2 className="h-4 w-4 mr-2" />
                           Remove Spotlight
@@ -863,7 +924,7 @@ const formatPrice = (value) => {
                                         <Eye className="h-4 w-4 mr-2" />
                                         View
                                       </DropdownMenuItem>
-                                      {product.is_verified && product.is_active && canSpotlight && (
+                                      {product.is_verified && product.is_active && !product.is_spotlighted && canSpotlight && (
                                         <DropdownMenuItem
                                           className="cursor-pointer group flex items-center gap-2 hover:bg-[#E0B74F] hover:text-[#0B0B0D] focus:bg-[#E0B74F] focus:text-[#0B0B0D] transition-colors"
                                           onClick={() => setSpotlightProduct(product)}
@@ -878,6 +939,15 @@ const formatPrice = (value) => {
                                             <Edit2 className="h-4 w-4 mr-2" />
                                             Edit
                                           </DropdownMenuItem>
+                                          {/* {product.is_active && (
+                                            <DropdownMenuItem
+                                              className="text-destructive cursor-pointer focus:text-destructive"
+                                              onClick={() => handleQuickDisable(product.id)}
+                                            >
+                                              <X className="h-4 w-4 mr-2" />
+                                              Make Disable
+                                            </DropdownMenuItem>
+                                          )} */}
                                           <DropdownMenuItem
                                             className="text-destructive cursor-pointer focus:text-destructive"
                                             onClick={() => setDeleteProductId(product.id)}
@@ -1017,6 +1087,7 @@ const formatPrice = (value) => {
                   id="is-verified"
                   checked={editProduct.is_verified}
                   onCheckedChange={(checked) => setEditProduct({ ...editProduct, is_verified: checked })}
+                  disabled={editProduct.is_verified}
                 />
               </div>
               {/* <div className="flex items-center justify-between">
@@ -1415,10 +1486,16 @@ const formatPrice = (value) => {
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="inactive">Inactive</SelectItem>
+                    <SelectItem value="active" disabled={areAllSelectedActive()}>Active</SelectItem>
+                    <SelectItem value="inactive" disabled={areAllSelectedInactive()}>Inactive</SelectItem>
                   </SelectContent>
                 </Select>
+                {areAllSelectedActive() && (
+                  <p className="text-xs text-muted-foreground mt-1">All selected products are already active</p>
+                )}
+                {areAllSelectedInactive() && (
+                  <p className="text-xs text-muted-foreground mt-1">All selected products are already inactive</p>
+                )}
               </div>
             </div>
             <div className="flex justify-end gap-2 pt-4 border-t border-border">
@@ -1432,7 +1509,7 @@ const formatPrice = (value) => {
               <Button
                 onClick={handleBulkStatusChange}
                 className="gradient-driptyard-hover text-white"
-                disabled={bulkActionLoading}
+                disabled={bulkActionLoading || (bulkStatusValue === "active" && areAllSelectedActive()) || (bulkStatusValue === "inactive" && areAllSelectedInactive())}
               >
                 {bulkActionLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 Update Status
@@ -1457,10 +1534,16 @@ const formatPrice = (value) => {
                     <SelectValue placeholder="Select verification" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="verified">Verified</SelectItem>
-                    <SelectItem value="unverified">Unverified</SelectItem>
+                    <SelectItem value="verified" disabled={areAllSelectedVerified()}>Verified</SelectItem>
+                    <SelectItem value="unverified" disabled={areAllSelectedUnverified()}>Unverified</SelectItem>
                   </SelectContent>
                 </Select>
+                {areAllSelectedVerified() && (
+                  <p className="text-xs text-muted-foreground mt-1">All selected products are already verified</p>
+                )}
+                {areAllSelectedUnverified() && (
+                  <p className="text-xs text-muted-foreground mt-1">All selected products are already unverified</p>
+                )}
               </div>
             </div>
             <div className="flex justify-end gap-2 pt-4 border-t border-border">
@@ -1474,7 +1557,7 @@ const formatPrice = (value) => {
               <Button
                 onClick={handleBulkVerificationChange}
                 className="gradient-driptyard-hover text-white"
-                disabled={bulkActionLoading}
+                disabled={bulkActionLoading || (bulkVerificationValue === "verified" && areAllSelectedVerified()) || (bulkVerificationValue === "unverified" && areAllSelectedUnverified())}
               >
                 {bulkActionLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 Update Verification
@@ -1518,6 +1601,9 @@ const formatPrice = (value) => {
                     <Label htmlFor="bulk-custom" className="cursor-pointer font-normal">Custom</Label>
                   </div>
                 </RadioGroup>
+                {areAllSelectedSpotlighted() && (
+                  <p className="text-xs text-muted-foreground mt-2">All selected products are already spotlighted</p>
+                )}
                 {bulkSpotlightDuration === "custom" && (
                   <div className="mt-4 space-y-3">
                     <div className="space-y-2">
@@ -1654,7 +1740,7 @@ const formatPrice = (value) => {
               <Button
                 onClick={handleBulkSpotlight}
                 className="gradient-driptyard-hover text-white"
-                disabled={bulkActionLoading || (bulkSpotlightDuration === "custom" && !bulkSpotlightCustomDate)}
+                disabled={bulkActionLoading || areAllSelectedSpotlighted() || (bulkSpotlightDuration === "custom" && !bulkSpotlightCustomDate)}
               >
                 {bulkActionLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 Apply Spotlight

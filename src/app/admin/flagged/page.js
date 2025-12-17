@@ -70,7 +70,7 @@ function FlaggedContent() {
     fetchFlaggedContent();
     // Clear selection when filters change
     setSelectedItems(new Set());
-  }, [currentPage, searchTerm, priceSort, reportCountSort]);
+  }, [currentPage, searchTerm, status, priceSort, reportCountSort]);
 
   const formatDate = (dateString) => {
     if (!dateString) return "Unknown date";
@@ -83,6 +83,20 @@ function FlaggedContent() {
   };
 
   const normalizeFlaggedItem = (item) => {
+    // Determine status based on product_is_flagged
+    // 0 = pending, 1 = approved, 2 = rejected
+    let productStatus = "pending";
+    const flaggedValue = item.product_is_flagged;
+    
+    if (flaggedValue === 1) {
+      productStatus = "approved";
+    } else if (flaggedValue === 2) {
+      productStatus = "rejected";
+    } else {
+      // 0, null, undefined, or any other value = pending
+      productStatus = "pending";
+    }
+
     return {
       id: item.product_id || item.latest_report_id,
       productId: item.product_id,
@@ -94,6 +108,7 @@ function FlaggedContent() {
       reason: item.latest_report_reason || "No reason provided",
       date: formatDate(item.latest_report_created_at || item.first_reported_at),
       status: item.latest_report_status || "pending",
+      productStatus: productStatus, // Status based on product_is_flagged
       image: item.product_images && item.product_images.length > 0 ? item.product_images[0] : "",
       images: item.product_images || [],
       reportCount: item.report_count || 0,
@@ -180,10 +195,17 @@ function FlaggedContent() {
       let items = data.reports || [];
       
       const normalizedItems = items.map(normalizeFlaggedItem);
-      const sortedItems = applySorting(normalizedItems);
+      
+      // Filter by status if not "all"
+      let filteredItems = normalizedItems;
+      if (status && status !== "all") {
+        filteredItems = normalizedItems.filter(item => item.productStatus === status);
+      }
+      
+      const sortedItems = applySorting(filteredItems);
       setFlaggedContent(sortedItems);
       setTotalPages(data.total_pages || 1);
-      setTotalCount(data.total || normalizedItems.length || 0);
+      setTotalCount(filteredItems.length || 0);
       setPageSize(data.page_size || 10);
     } catch (error) {
       notifyError(error.response?.data?.detail || error.message || "Failed to fetch flagged content");
@@ -195,15 +217,34 @@ function FlaggedContent() {
 
   const handleClearFilters = () => {
     setSearchTerm("");
+    setStatus("all");
     setPriceSort("none");
     setReportCountSort("none");
     setCurrentPage(1);
   };
 
-  const hasActiveFilters = searchTerm || priceSort !== "none" || reportCountSort !== "none";
+  const hasActiveFilters = searchTerm || status !== "all" || priceSort !== "none" || reportCountSort !== "none";
 
   const getStatusBadgeVariant = (status) => {
     return STATUS_SUCCESS_STATES.includes((status || "").toLowerCase()) ? "success" : "destructive";
+  };
+
+  const getProductStatusBadgeVariant = (productStatus) => {
+    if (productStatus === "approved") {
+      return "success";
+    } else if (productStatus === "rejected") {
+      return "destructive";
+    }
+    return "outline"; // pending
+  };
+
+  const getProductStatusText = (productStatus) => {
+    if (productStatus === "approved") {
+      return "Approved";
+    } else if (productStatus === "rejected") {
+      return "Rejected";
+    }
+    return "Pending";
   };
 
   const getUserStatusBadgeVariant = (user) => {
@@ -366,7 +407,7 @@ function FlaggedContent() {
               Filters
               {hasActiveFilters && (
                 <Badge variant="secondary" className="ml-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs">
-                  {[searchTerm, priceSort !== "none" ? "price" : null, reportCountSort !== "none" ? "reports" : null].filter(Boolean).length}
+                  {[searchTerm, status !== "all" ? "status" : null, priceSort !== "none" ? "price" : null, reportCountSort !== "none" ? "reports" : null].filter(Boolean).length}
                 </Badge>
               )}
             </Button>
@@ -394,6 +435,23 @@ function FlaggedContent() {
                     setCurrentPage(1);
                   }}
                 />
+              </div>
+              <div className="space-y-2 w-full md:w-auto md:min-w-[200px]">
+                <Label htmlFor="status">Status</Label>
+                <Select value={status} onValueChange={(value) => {
+                  setStatus(value);
+                  setCurrentPage(1);
+                }}>
+                  <SelectTrigger id="status">
+                    <SelectValue placeholder="All Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="approved">Approved</SelectItem>
+                    <SelectItem value="rejected">Rejected</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2 w-full md:w-auto md:min-w-[200px]">
                 <Label htmlFor="priceSort">Sort by Price</Label>
@@ -501,6 +559,7 @@ function FlaggedContent() {
                     <TableHead className="h-12 px-4 font-semibold text-secondary max-w-[250px]">Title</TableHead>
                     <TableHead className="h-12 px-4 font-semibold text-secondary max-w-[100px]">Price</TableHead>
                     <TableHead className="h-12 px-4 font-semibold text-secondary max-w-[100px]">Reports</TableHead>
+                    <TableHead className="h-12 px-4 font-semibold text-secondary max-w-[120px]">Status</TableHead>
                     <TableHead className="h-12 px-4 font-semibold text-secondary max-w-[150px]">Date</TableHead>
                     {canManageFlaggedContent && (
                       <TableHead className="h-12 px-4 text-right font-semibold text-secondary max-w-[100px]">Actions</TableHead>
@@ -590,6 +649,11 @@ function FlaggedContent() {
                             {item.reportCount || 0} {item.reportCount === 1 ? 'Report' : 'Reports'}
                           </p>
                         </TableCell>
+                        <TableCell className="py-3 px-4 max-w-[120px]">
+                          <Badge variant={getProductStatusBadgeVariant(item.productStatus)} className="text-xs">
+                            {getProductStatusText(item.productStatus)}
+                          </Badge>
+                        </TableCell>
                         <TableCell className="py-3 px-4 max-w-[150px]">
                           <p className="text-sm text-foreground">{item.date}</p>
                         </TableCell>
@@ -637,18 +701,19 @@ function FlaggedContent() {
                                     </DropdownMenuItem>
                                   </>
                                 ) : (
-                                  <DropdownMenuItem
-                                    className="cursor-pointer"
-                                    onClick={() => handleReReview(item)}
-                                    disabled={loadingActions[`review-${item.reportId}`]}
-                                  >
-                                    {loadingActions[`review-${item.reportId}`] ? (
-                                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                    ) : (
-                                      <Check className="h-4 w-4 mr-2" />
-                                    )}
-                                    Review Again
-                                  </DropdownMenuItem>
+                                  // <DropdownMenuItem
+                                  //   className="cursor-pointer"
+                                  //   onClick={() => handleReReview(item)}
+                                  //   disabled={loadingActions[`review-${item.reportId}`]}
+                                  // >
+                                  //   {loadingActions[`review-${item.reportId}`] ? (
+                                  //     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                  //   ) : (
+                                  //     <Check className="h-4 w-4 mr-2" />
+                                  //   )}
+                                  //   Review Again
+                                  // </DropdownMenuItem>
+                                  <></>
                                 )}
                               </DropdownMenuContent>
                             </DropdownMenu>
@@ -767,9 +832,9 @@ function FlaggedContent() {
                             <TableHead className="h-12 px-4 font-semibold text-secondary">Username</TableHead>
                             <TableHead className="h-12 px-4 font-semibold text-secondary">Email</TableHead>
                             <TableHead className="h-12 px-4 font-semibold text-secondary">Reason</TableHead>
-                            <TableHead className="h-12 px-4 font-semibold text-secondary">Status</TableHead>
-                            <TableHead className="h-12 px-4 font-semibold text-secondary">Created At</TableHead>
-                            <TableHead className="h-12 px-4 font-semibold text-secondary">Updated At</TableHead>
+                            {/* <TableHead className="h-12 px-4 font-semibold text-secondary">Status</TableHead> */}
+                            <TableHead className="h-12 px-4 font-semibold text-secondary">Reported At</TableHead>
+                            {/* <TableHead className="h-12 px-4 font-semibold text-secondary">Updated At</TableHead> */}
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -792,24 +857,24 @@ function FlaggedContent() {
                                   {report.reason || "No reason provided"}
                                 </p>
                               </TableCell>
-                              <TableCell className="py-3 px-4">
+                              {/* <TableCell className="py-3 px-4">
                                 <Badge 
                                   variant={getStatusBadgeVariant(report.status)} 
                                   className="capitalize text-xs"
                                 >
                                   {report.status || "N/A"}
                                 </Badge>
-                              </TableCell>
+                              </TableCell> */}
                               <TableCell className="py-3 px-4">
                                 <p className="text-sm text-foreground">
                                   {report.created_at ? formatDateTime(report.created_at) : "N/A"}
                                 </p>
                               </TableCell>
-                              <TableCell className="py-3 px-4">
+                              {/* <TableCell className="py-3 px-4">
                                 <p className="text-sm text-foreground">
                                   {report.updated_at ? formatDateTime(report.updated_at) : "N/A"}
                                 </p>
-                              </TableCell>
+                              </TableCell> */}
                             </TableRow>
                           ))}
                         </TableBody>

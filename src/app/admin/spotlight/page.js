@@ -6,7 +6,7 @@ import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Star, ChevronLeft, ChevronRight, Filter, X, Edit2, Trash2, MoreVertical, Loader2, ExternalLink } from "lucide-react";
+import { Star, ChevronLeft, ChevronRight, ChevronDown, Filter, X, Edit2, Trash2, MoreVertical, Loader2, ExternalLink } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -41,13 +41,13 @@ const STATUS_OPTIONS = [
   { value: "all", label: "All Status" },
   { value: "active", label: "Active" },
   { value: "removed", label: "Removed" },
-  { value: "expired", label: "Expired" },
-  { value: "edited", label: "Edited" },
+  { value: "expired", label: "Expired" },   
+  { value: "paused", label: "Paused" },
 ];
 
 function Spotlight() {
   const { user } = useAuth();
-  const [history, setHistory] = useState([]);
+  const [spotlights, setSpotlights] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -57,6 +57,7 @@ function Spotlight() {
   const [dateFrom, setDateFrom] = useState(null);
   const [dateTo, setDateTo] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [expandedRows, setExpandedRows] = useState(new Set());
   const [editItem, setEditItem] = useState(null);
   const [editDuration, setEditDuration] = useState("24");
   const [editCustomDate, setEditCustomDate] = useState(null);
@@ -100,7 +101,7 @@ function Spotlight() {
       }
 
       const data = await apiClient.getSpotlightHistory(params);
-      setHistory(data.history || []);
+      setSpotlights(data.spotlights || []);
       setTotalPages(data.total_pages || 1);
       setTotalCount(data.total || 0);
       setPageSize(data.page_size || 20);
@@ -128,19 +129,25 @@ function Spotlight() {
 
   const getStatusBadge = (item) => {
     const action = item.action?.toLowerCase() || "";
-    if (action === "active") {
+    const status = item.status?.toLowerCase() || "";
+    const statusValue = action || status;
+    
+    if (statusValue === "active") {
       return <Badge variant="success" className="text-xs">Active</Badge>;
     }
-    if (action === "expired") {
+    if (statusValue === "expired") {
       return <Badge variant="destructive" className="text-xs">Expired</Badge>;
     }
-    if (action === "removed") {
+    if (statusValue === "removed") {
       return <Badge variant="destructive" className="text-xs">Removed</Badge>;
     }
-    if (action === "edited") {
+    if (statusValue === "edited") {
       return <Badge variant="outline" className="text-xs">Edited</Badge>;
     }
-    return <Badge variant="outline" className="text-xs capitalize">{action || "—"}</Badge>;
+    if (statusValue === "paused") {
+      return <Badge variant="outline" className="text-xs">Paused</Badge>;
+    }
+    return <Badge variant="outline" className="text-xs capitalize">{statusValue || "—"}</Badge>;
   };
 
   const formatDate = (dateString) => {
@@ -150,6 +157,28 @@ function Spotlight() {
     } catch {
       return dateString;
     }
+  };
+
+  // Check if spotlight should show Edit/Remove actions
+  // Show for active spotlights (including expired ones that were previously active)
+  // Don't show for removed spotlights
+  const shouldShowActions = (item) => {
+    const action = item.action?.toLowerCase() || "";
+    const status = item.status?.toLowerCase() || "";
+    // Show if active (regardless of whether expired or not)
+    // Don't show if already removed
+    return action === "active" || status === "active";
+  };
+
+  // Toggle expand/collapse for a row
+  const toggleExpand = (spotlightId) => {
+    const newExpanded = new Set(expandedRows);
+    if (newExpanded.has(spotlightId)) {
+      newExpanded.delete(spotlightId);
+    } else {
+      newExpanded.add(spotlightId);
+    }
+    setExpandedRows(newExpanded);
   };
 
 
@@ -326,7 +355,7 @@ function Spotlight() {
                 <Skeleton key={i} className="h-16 w-full" />
               ))}
             </div>
-          ) : history.length === 0 ? (
+          ) : spotlights.length === 0 ? (
             <div className="text-center py-12">
               <Star className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <p className="text-muted-foreground">No spotlight history found</p>
@@ -336,6 +365,7 @@ function Spotlight() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/50 hover:bg-muted/50">
+                    <TableHead className="h-12 px-4 font-semibold text-secondary w-12"></TableHead>
                     <TableHead className="h-12 px-4 font-semibold text-secondary max-w-[300px]">Listing</TableHead>
                     <TableHead className="h-12 px-4 font-semibold text-secondary">Seller</TableHead>
                     <TableHead className="h-12 px-4 font-semibold text-secondary">Started At</TableHead>
@@ -349,13 +379,12 @@ function Spotlight() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {history.map((item) => {
-                    const productId = item.product_id;
+                  {spotlights.map((spotlight) => {
+                    const isExpanded = expandedRows.has(spotlight.id);
+                    const hasChildren = spotlight.products && spotlight.products.length > 0;
+                    const productId = spotlight.product_id;
                     const websiteUrl = process.env.NEXT_PUBLIC_WEBSITE_URL || "https://driptyard.vercel.app";
-                    // Ensure proper URL construction with /products/ path
-                    // Remove trailing slash and check if /products/ already exists
                     let baseUrl = websiteUrl.endsWith('/') ? websiteUrl.slice(0, -1) : websiteUrl;
-                    // If baseUrl already ends with /products, use it as is, otherwise add /products
                     if (!baseUrl.endsWith('/products')) {
                       baseUrl = `${baseUrl}/products`;
                     }
@@ -366,111 +395,246 @@ function Spotlight() {
                         window.open(productUrl, "_blank");
                       }
                     };
-                    
+
+                    // Render parent row
                     return (
-                      <TableRow 
-                        key={item.id || item.spotlight_id} 
-                        className={`hover:bg-muted/30 transition-colors ${productUrl ? "cursor-pointer" : ""}`}
-                        onDoubleClick={productUrl ? handleRowClick : undefined}
-                      >
-                        <TableCell className="py-3 px-4 max-w-[300px]">
-                          <div className="flex items-center gap-3">
-                            <div className="h-12 w-12 rounded-lg border border-border overflow-hidden bg-muted/50 shadow-sm flex-shrink-0">
-                              {item.product_image ? (
-                                <img
-                                  src={item.product_image}
-                                  alt={item.product_title || "Product"}
-                                  className="h-full w-full object-cover"
-                                />
-                              ) : (
-                                <div className="flex h-full w-full items-center justify-center text-[10px] font-medium text-muted-foreground">
-                                  No Image
-                                </div>
-                              )}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="font-semibold text-sm text-primary leading-tight break-words">
-                                {item.product_title || "Untitled listing"}
-                              </p>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="py-3 px-4">
-                          <p className="text-sm text-foreground">@{item.seller_username || "—"}</p>
-                        </TableCell>
-                        <TableCell className="py-3 px-4">
-                          <p className="text-sm text-foreground">{formatDate(item.start_time)}</p>
-                        </TableCell>
-                        <TableCell className="py-3 px-4">
-                          <p className="text-sm text-foreground">{formatDate(item.end_time)}</p>
-                        </TableCell>
-                        <TableCell className="py-3 px-4">
-                          <p className="text-sm text-foreground">
-                            {item.duration_hours ? `${item.duration_hours} hours` : "—"}
-                          </p>
-                        </TableCell>
-                        <TableCell className="py-3 px-4">
-                          <p className="text-sm text-foreground">@{item.applied_by_username || "—"}</p>
-                        </TableCell>
-                        <TableCell className="py-3 px-4">
-                          {getStatusBadge(item)}
-                        </TableCell>
-                        {(canSpotlight || canRemoveSpotlight) && (
-                          <TableCell className="py-3 px-4 text-right">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8">
-                                  <MoreVertical className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                {productUrl && (
-                                  <DropdownMenuItem
-                                    className="cursor-pointer"
-                                    onClick={() => {
-                                      if (productUrl) {
-                                        window.open(productUrl, "_blank");
-                                      }
-                                    }}
-                                  >
-                                    <ExternalLink className="h-4 w-4 mr-2" />
-                                    View Listing
-                                  </DropdownMenuItem>
+                      <>
+                        <TableRow 
+                          key={spotlight.id} 
+                          className={`hover:bg-muted/30 transition-colors ${productUrl ? "cursor-pointer" : ""}`}
+                          onDoubleClick={productUrl ? handleRowClick : undefined}
+                        >
+                          <TableCell className="py-3 px-4">
+                            {hasChildren ? (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleExpand(spotlight.id);
+                                }}
+                              >
+                                {isExpanded ? (
+                                  <ChevronDown className="h-4 w-4" />
+                                ) : (
+                                  <ChevronRight className="h-4 w-4" />
                                 )}
-                                {canSpotlight && (
-                                  <DropdownMenuItem
-                                    className="cursor-pointer group flex items-center gap-2 hover:bg-[#E0B74F] hover:text-[#0B0B0D] focus:bg-[#E0B74F] focus:text-[#0B0B0D] transition-colors"
-                                    onClick={() => {
-                                      setEditItem(item);
-                                      // Set default duration based on item
-                                      if (item.duration_hours) {
-                                        setEditDuration(String(item.duration_hours));
-                                      } else if (item.end_time) {
-                                        setEditDuration("custom");
-                                        setEditCustomDate(new Date(item.end_time));
-                                      } else {
-                                        setEditDuration("24");
-                                      }
-                                    }}
-                                  >
-                                    <Edit2 className="h-4 w-4 text-accent transition-colors group-hover:text-[#0B0B0D] group-focus:text-[#0B0B0D]" />
-                                    Edit
-                                  </DropdownMenuItem>
-                                )}
-                                {canRemoveSpotlight && (
-                                  <DropdownMenuItem
-                                    className="text-destructive cursor-pointer focus:text-destructive"
-                                    onClick={() => setRemoveItem(item)}
-                                  >
-                                    <Trash2 className="h-4 w-4 mr-2" />
-                                    Remove
-                                  </DropdownMenuItem>
-                                )}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
+                              </Button>
+                            ) : (
+                              <div className="w-6" />
+                            )}
                           </TableCell>
-                        )}
-                      </TableRow>
+                          <TableCell className="py-3 px-4 max-w-[300px]">
+                            <div className="flex items-center gap-3">
+                              <div className="h-12 w-12 rounded-lg border border-border overflow-hidden bg-muted/50 shadow-sm flex-shrink-0">
+                                {spotlight.product_image ? (
+                                  <img
+                                    src={spotlight.product_image}
+                                    alt={spotlight.product_title || "Product"}
+                                    className="h-full w-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="flex h-full w-full items-center justify-center text-[10px] font-medium text-muted-foreground">
+                                    No Image
+                                  </div>
+                                )}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="font-semibold text-sm text-primary leading-tight break-words">
+                                  {spotlight.product_title || "Untitled listing"}
+                                </p>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-3 px-4">
+                            <p className="text-sm text-foreground">@{spotlight.applied_by_username || "—"}</p>
+                          </TableCell>
+                          <TableCell className="py-3 px-4">
+                            <p className="text-sm text-foreground">{formatDate(spotlight.start_time)}</p>
+                          </TableCell>
+                          <TableCell className="py-3 px-4">
+                            <p className="text-sm text-foreground">{formatDate(spotlight.end_time)}</p>
+                          </TableCell>
+                          <TableCell className="py-3 px-4">
+                            <p className="text-sm text-foreground">
+                              {spotlight.duration_hours ? `${spotlight.duration_hours} hours` : "—"}
+                            </p>
+                          </TableCell>
+                          <TableCell className="py-3 px-4">
+                            <p className="text-sm text-foreground">@{spotlight.applied_by_username || "—"}</p>
+                          </TableCell>
+                          <TableCell className="py-3 px-4">
+                            {getStatusBadge(spotlight)}
+                          </TableCell>
+                          {(canSpotlight || canRemoveSpotlight) && (
+                            <TableCell className="py-3 px-4 text-right">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                                    <MoreVertical className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  {productUrl && (
+                                    <DropdownMenuItem
+                                      className="cursor-pointer"
+                                      onClick={() => {
+                                        if (productUrl) {
+                                          window.open(productUrl, "_blank");
+                                        }
+                                      }}
+                                    >
+                                      <ExternalLink className="h-4 w-4 mr-2" />
+                                      View Listing
+                                    </DropdownMenuItem>
+                                  )}
+                                  {canSpotlight && shouldShowActions(spotlight) && (
+                                    <DropdownMenuItem
+                                      className="cursor-pointer group flex items-center gap-2 hover:bg-[#E0B74F] hover:text-[#0B0B0D] focus:bg-[#E0B74F] focus:text-[#0B0B0D] transition-colors"
+                                      onClick={() => {
+                                        setEditItem(spotlight);
+                                        if (spotlight.duration_hours) {
+                                          setEditDuration(String(spotlight.duration_hours));
+                                        } else if (spotlight.end_time) {
+                                          setEditDuration("custom");
+                                          setEditCustomDate(new Date(spotlight.end_time));
+                                        } else {
+                                          setEditDuration("24");
+                                        }
+                                      }}
+                                    >
+                                      <Edit2 className="h-4 w-4 text-accent transition-colors group-hover:text-[#0B0B0D] group-focus:text-[#0B0B0D]" />
+                                      Edit
+                                    </DropdownMenuItem>
+                                  )}
+                                  {canRemoveSpotlight && shouldShowActions(spotlight) && (
+                                    <DropdownMenuItem
+                                      className="text-destructive cursor-pointer focus:text-destructive"
+                                      onClick={() => setRemoveItem(spotlight)}
+                                    >
+                                      <Trash2 className="h-4 w-4 mr-2" />
+                                      Remove
+                                    </DropdownMenuItem>
+                                  )}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                        {/* Render child rows when expanded */}
+                        {isExpanded && hasChildren && spotlight.products.map((childItem) => {
+                          const childProductId = childItem.product_id;
+                          const childProductUrl = childProductId ? `${baseUrl}/${childProductId}` : null;
+                          
+                          return (
+                            <TableRow 
+                              key={childItem.id} 
+                              className="bg-muted/20 hover:bg-muted/30 transition-colors"
+                            >
+                              <TableCell className="py-3 px-4">
+                                <div className="w-6 ml-4 border-l-2 border-muted-foreground/30" />
+                              </TableCell>
+                              <TableCell className="py-3 px-4 max-w-[300px]">
+                                <div className="flex items-center gap-3 ml-4">
+                                  <div className="h-10 w-10 rounded-lg border border-border overflow-hidden bg-muted/50 shadow-sm flex-shrink-0">
+                                    {childItem.product_image ? (
+                                      <img
+                                        src={childItem.product_image}
+                                        alt={childItem.product_title || "Product"}
+                                        className="h-full w-full object-cover"
+                                      />
+                                    ) : (
+                                      <div className="flex h-full w-full items-center justify-center text-[10px] font-medium text-muted-foreground">
+                                        No Image
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <p className="font-medium text-sm text-primary leading-tight break-words">
+                                      {childItem.product_title || "Untitled listing"}
+                                    </p>
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell className="py-3 px-4">
+                                <p className="text-sm text-foreground">@{childItem.seller_username || "—"}</p>
+                              </TableCell>
+                              <TableCell className="py-3 px-4">
+                                <p className="text-sm text-foreground">{formatDate(childItem.start_time)}</p>
+                              </TableCell>
+                              <TableCell className="py-3 px-4">
+                                <p className="text-sm text-foreground">{formatDate(childItem.end_time)}</p>
+                              </TableCell>
+                              <TableCell className="py-3 px-4">
+                                <p className="text-sm text-foreground">
+                                  {childItem.duration_hours ? `${childItem.duration_hours} hours` : "—"}
+                                </p>
+                              </TableCell>
+                              <TableCell className="py-3 px-4">
+                                <p className="text-sm text-foreground">@{childItem.applied_by_username || "—"}</p>
+                              </TableCell>
+                              <TableCell className="py-3 px-4">
+                                {getStatusBadge(childItem)}
+                              </TableCell>
+                              {/* {(canSpotlight || canRemoveSpotlight) && (
+                                <TableCell className="py-3 px-4 text-right">
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                                        <MoreVertical className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      {childProductUrl && (
+                                        <DropdownMenuItem
+                                          className="cursor-pointer"
+                                          onClick={() => {
+                                            if (childProductUrl) {
+                                              window.open(childProductUrl, "_blank");
+                                            }
+                                          }}
+                                        >
+                                          <ExternalLink className="h-4 w-4 mr-2" />
+                                          View Listing
+                                        </DropdownMenuItem>
+                                      )}
+                                      {canSpotlight && shouldShowActions(childItem) && (
+                                        <DropdownMenuItem
+                                          className="cursor-pointer group flex items-center gap-2 hover:bg-[#E0B74F] hover:text-[#0B0B0D] focus:bg-[#E0B74F] focus:text-[#0B0B0D] transition-colors"
+                                          onClick={() => {
+                                            setEditItem(childItem);
+                                            if (childItem.duration_hours) {
+                                              setEditDuration(String(childItem.duration_hours));
+                                            } else if (childItem.end_time) {
+                                              setEditDuration("custom");
+                                              setEditCustomDate(new Date(childItem.end_time));
+                                            } else {
+                                              setEditDuration("24");
+                                            }
+                                          }}
+                                        >
+                                          <Edit2 className="h-4 w-4 text-accent transition-colors group-hover:text-[#0B0B0D] group-focus:text-[#0B0B0D]" />
+                                          Edit
+                                        </DropdownMenuItem>
+                                      )}
+                                      {canRemoveSpotlight && shouldShowActions(childItem) && (
+                                        <DropdownMenuItem
+                                          className="text-destructive cursor-pointer focus:text-destructive"
+                                          onClick={() => setRemoveItem(childItem)}
+                                        >
+                                          <Trash2 className="h-4 w-4 mr-2" />
+                                          Remove
+                                        </DropdownMenuItem>
+                                      )}
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </TableCell>
+                              )} */}
+                            </TableRow>
+                          );
+                        })}
+                      </>
                     );
                   })}
                 </TableBody>

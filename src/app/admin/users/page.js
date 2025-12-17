@@ -31,6 +31,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { apiClient } from "@/lib/api-client";
 import { notifyError, notifySuccess } from "@/lib/toast";
 import { format } from "date-fns";
@@ -334,6 +335,12 @@ function Users() {
     try {
       await apiClient.deleteAdminUser(deleteUserId);
       notifySuccess("User has been permanently deleted");
+      // Remove deleted user from bulk selection if it was selected
+      setSelectedUsers(prev => {
+        const newSelected = new Set(prev);
+        newSelected.delete(deleteUserId);
+        return newSelected;
+      });
       setDeleteUserId(null);
       fetchUsers();
     } catch (error) {
@@ -461,6 +468,20 @@ function Users() {
 
   const isAllSelected = users.length > 0 && selectedUsers.size === users.length;
   const isIndeterminate = selectedUsers.size > 0 && selectedUsers.size < users.length;
+
+  // Check if all selected users are already reinstated (not suspended)
+  const areAllSelectedUsersReinstated = () => {
+    if (selectedUsers.size === 0) return false;
+    const selectedUsersList = users.filter(u => selectedUsers.has(u.id));
+    return selectedUsersList.length > 0 && selectedUsersList.every(u => !u.is_suspended);
+  };
+
+  // Check if all selected users are already suspended
+  const areAllSelectedUsersSuspended = () => {
+    if (selectedUsers.size === 0) return false;
+    const selectedUsersList = users.filter(u => selectedUsers.has(u.id));
+    return selectedUsersList.length > 0 && selectedUsersList.every(u => u.is_suspended);
+  };
 
   // Bulk action handlers
   const handleBulkDelete = async () => {
@@ -796,26 +817,52 @@ function Users() {
                     >
                       Change Status
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setBulkSuspendDialog(true)}
-                      disabled={bulkActionLoading}
-                      className="flex items-center gap-2"
-                    >
-                      <Ban className="h-4 w-4" />
-                      Suspend
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setBulkReinstateDialog(true)}
-                      disabled={bulkActionLoading}
-                      className="flex items-center gap-2"
-                    >
-                      <Unlock className="h-4 w-4" />
-                      Reinstate
-                    </Button>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setBulkSuspendDialog(true)}
+                              disabled={bulkActionLoading || areAllSelectedUsersSuspended()}
+                              className="flex items-center gap-2"
+                            >
+                              <Ban className="h-4 w-4" />
+                              Suspend
+                            </Button>
+                          </span>
+                        </TooltipTrigger>
+                        {areAllSelectedUsersSuspended() && (
+                          <TooltipContent>
+                            <p>User already suspended</p>
+                          </TooltipContent>
+                        )}
+                      </Tooltip>
+                    </TooltipProvider>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setBulkReinstateDialog(true)}
+                              disabled={bulkActionLoading || areAllSelectedUsersReinstated()}
+                              className="flex items-center gap-2"
+                            >
+                              <Unlock className="h-4 w-4" />
+                              Reinstate
+                            </Button>
+                          </span>
+                        </TooltipTrigger>
+                        {areAllSelectedUsersReinstated() && (
+                          <TooltipContent>
+                            <p>User already reinstated</p>
+                          </TooltipContent>
+                        )}
+                      </Tooltip>
+                    </TooltipProvider>
                     <Button
                       variant="destructive"
                       size="sm"
@@ -910,17 +957,66 @@ function Users() {
                                   <Edit2 className="h-4 w-4 mr-2" />
                                   Edit
                                 </DropdownMenuItem>
-                                {user.is_suspended ? (
-                                  <DropdownMenuItem className="cursor-pointer" onClick={() => handleUnsuspendUser(user.id)}>
-                                    <Unlock className="h-4 w-4 mr-2" />
-                                    Reinstate
-                                  </DropdownMenuItem>
-                                ) : (
-                                  <DropdownMenuItem className="cursor-pointer" onClick={() => setSuspendUserId(user.id)}>
-                                    <Ban className="h-4 w-4 mr-2" />
-                                    Suspend
-                                  </DropdownMenuItem>
-                                )}
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className="w-full">
+                                        <DropdownMenuItem 
+                                          className={user.is_suspended ? "cursor-pointer" : "cursor-not-allowed opacity-50"} 
+                                          onClick={() => {
+                                            if (user.is_suspended) {
+                                              handleUnsuspendUser(user.id);
+                                            }
+                                          }}
+                                          disabled={!user.is_suspended}
+                                          onSelect={(e) => {
+                                            if (!user.is_suspended) {
+                                              e.preventDefault();
+                                            }
+                                          }}
+                                        >
+                                          <Unlock className="h-4 w-4 mr-2" />
+                                          Reinstate
+                                        </DropdownMenuItem>
+                                      </span>
+                                    </TooltipTrigger>
+                                    {!user.is_suspended && (
+                                      <TooltipContent>
+                                        <p>User already reinstated</p>
+                                      </TooltipContent>
+                                    )}
+                                  </Tooltip>
+                                </TooltipProvider>
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className="w-full">
+                                        <DropdownMenuItem 
+                                          className={user.is_suspended ? "cursor-not-allowed opacity-50" : "cursor-pointer"} 
+                                          onClick={() => {
+                                            if (!user.is_suspended) {
+                                              setSuspendUserId(user.id);
+                                            }
+                                          }}
+                                          disabled={user.is_suspended}
+                                          onSelect={(e) => {
+                                            if (user.is_suspended) {
+                                              e.preventDefault();
+                                            }
+                                          }}
+                                        >
+                                          <Ban className="h-4 w-4 mr-2" />
+                                          Suspend
+                                        </DropdownMenuItem>
+                                      </span>
+                                    </TooltipTrigger>
+                                    {user.is_suspended && (
+                                      <TooltipContent>
+                                        <p>User already suspended</p>
+                                      </TooltipContent>
+                                    )}
+                                  </Tooltip>
+                                </TooltipProvider>
                                 <DropdownMenuItem className="cursor-pointer" onClick={() => setResetPasswordUserId(user.id)}>
                                   <KeyRound className="h-4 w-4 mr-2" />
                                   Reset Password

@@ -29,6 +29,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Search, Edit, ChevronLeft, ChevronRight, Loader2, Plus, Filter, X, Eye, Ban, Unlock, KeyRound, Trash2, MoreVertical, EyeOff, Edit2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiClient } from "@/lib/api-client";
@@ -44,6 +45,7 @@ function RolesAndPermissions() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [status, setStatus] = useState("all");
+  const [joinDateSort, setJoinDateSort] = useState("none");
   const [showFilters, setShowFilters] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -116,7 +118,9 @@ function RolesAndPermissions() {
         items = items.filter((moderator) => moderator.is_active === false);
       }
       
-      setModerators(items);
+      // Apply sorting
+      const sortedItems = applySorting(items);
+      setModerators(sortedItems);
       setTotalPages(response.total_pages || 1);
       setTotalCount(response.total || items.length || 0);
       setPageSize(response.page_size || pageSize);
@@ -128,9 +132,36 @@ function RolesAndPermissions() {
     }
   };
 
+  const applySorting = (items) => {
+    // If no sorting is selected, return items as-is
+    if (joinDateSort === "none") {
+      return items;
+    }
+
+    let sortedItems = [...items];
+
+    // Apply sorting by join date
+    sortedItems.sort((a, b) => {
+      if (joinDateSort === "most-recent") {
+        const dateA = new Date(a.created_at || 0).getTime();
+        const dateB = new Date(b.created_at || 0).getTime();
+        return dateB - dateA; // Most recent first
+      } else if (joinDateSort === "least-recent") {
+        const dateA = new Date(a.created_at || 0).getTime();
+        const dateB = new Date(b.created_at || 0).getTime();
+        return dateA - dateB; // Least recent first
+      }
+
+      return 0;
+    });
+
+    return sortedItems;
+  };
+
   const handleClearFilters = () => {
     setSearchQuery("");
     setStatus("all");
+    setJoinDateSort("none");
     setCurrentPage(1);
   };
 
@@ -140,13 +171,13 @@ function RolesAndPermissions() {
     { value: "inactive", label: "Inactive" },
   ];
 
-  const hasActiveFilters = searchQuery || (status && status !== "all");
+  const hasActiveFilters = searchQuery || (status && status !== "all") || joinDateSort !== "none";
 
   useEffect(() => {
     fetchModerators();
     // Clear selection when filters change
     setSelectedModerators(new Set());
-  }, [currentPage, searchQuery, status]);
+  }, [currentPage, searchQuery, status, joinDateSort]);
 
   const openPermissionsDialog = async (moderator) => {
     setSelectedModerator(moderator);
@@ -471,6 +502,20 @@ function RolesAndPermissions() {
   const isAllSelected = moderators.length > 0 && selectedModerators.size === moderators.length;
   const isIndeterminate = selectedModerators.size > 0 && selectedModerators.size < moderators.length;
 
+  // Check if all selected moderators are already reinstated (not suspended and active)
+  const areAllSelectedModeratorsReinstated = () => {
+    if (selectedModerators.size === 0) return false;
+    const selectedModeratorsList = moderators.filter(m => selectedModerators.has(m.id || m.user_id));
+    return selectedModeratorsList.length > 0 && selectedModeratorsList.every(m => !m.is_suspended && m.is_active);
+  };
+
+  // Check if all selected moderators are already suspended
+  const areAllSelectedModeratorsSuspended = () => {
+    if (selectedModerators.size === 0) return false;
+    const selectedModeratorsList = moderators.filter(m => selectedModerators.has(m.id || m.user_id));
+    return selectedModeratorsList.length > 0 && selectedModeratorsList.every(m => m.is_suspended);
+  };
+
   // Bulk action handlers
   const handleBulkDelete = async () => {
     if (selectedModerators.size === 0) return;
@@ -676,7 +721,7 @@ function RolesAndPermissions() {
                 Filters
                 {hasActiveFilters && (
                   <Badge variant="secondary" className="ml-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs">
-                    {[searchQuery, status && status !== "all" ? status : null].filter(Boolean).length}
+                    {[searchQuery, status && status !== "all" ? status : null, joinDateSort !== "none" ? "join" : null].filter(Boolean).length}
                   </Badge>
                 )}
               </Button>
@@ -730,6 +775,22 @@ function RolesAndPermissions() {
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="space-y-2 w-full md:w-auto md:min-w-[200px]">
+                  <Label htmlFor="joinDateSort">Sort by Join Date</Label>
+                  <Select value={joinDateSort} onValueChange={(value) => {
+                    setJoinDateSort(value);
+                    setCurrentPage(1);
+                  }}>
+                    <SelectTrigger id="joinDateSort">
+                      <SelectValue placeholder="No sorting" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No sorting</SelectItem>
+                      <SelectItem value="most-recent">Most Recent</SelectItem>
+                      <SelectItem value="least-recent">Least Recent</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
           )}
@@ -765,26 +826,52 @@ function RolesAndPermissions() {
                     >
                       Change Status
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setBulkSuspendDialog(true)}
-                      disabled={bulkActionLoading}
-                      className="flex items-center gap-2"
-                    >
-                      <Ban className="h-4 w-4" />
-                      Suspend
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setBulkReinstateDialog(true)}
-                      disabled={bulkActionLoading}
-                      className="flex items-center gap-2"
-                    >
-                      <Unlock className="h-4 w-4" />
-                      Reinstate
-                    </Button>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setBulkSuspendDialog(true)}
+                              disabled={bulkActionLoading || areAllSelectedModeratorsSuspended()}
+                              className="flex items-center gap-2"
+                            >
+                              <Ban className="h-4 w-4" />
+                              Suspend
+                            </Button>
+                          </span>
+                        </TooltipTrigger>
+                        {areAllSelectedModeratorsSuspended() && (
+                          <TooltipContent>
+                            <p>User already suspended</p>
+                          </TooltipContent>
+                        )}
+                      </Tooltip>
+                    </TooltipProvider>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setBulkReinstateDialog(true)}
+                              disabled={bulkActionLoading || areAllSelectedModeratorsReinstated()}
+                              className="flex items-center gap-2"
+                            >
+                              <Unlock className="h-4 w-4" />
+                              Reinstate
+                            </Button>
+                          </span>
+                        </TooltipTrigger>
+                        {areAllSelectedModeratorsReinstated() && (
+                          <TooltipContent>
+                            <p>User already reinstated</p>
+                          </TooltipContent>
+                        )}
+                      </Tooltip>
+                    </TooltipProvider>
                     <Button
                       variant="destructive"
                       size="sm"
@@ -888,17 +975,66 @@ function RolesAndPermissions() {
                                   <Edit2 className="h-4 w-4 mr-2" />
                                   Edit
                                 </DropdownMenuItem>
-                                {moderator.is_suspended || !moderator.is_active ? (
-                                  <DropdownMenuItem className="cursor-pointer" onClick={() => handleReinstateUser(moderator)}>
-                                    <Unlock className="h-4 w-4 mr-2" />
-                                    Reinstate
-                                  </DropdownMenuItem>
-                                ) : (
-                                  <DropdownMenuItem className="cursor-pointer" onClick={() => setSuspendUserId(moderator.id || moderator.user_id)}>
-                                    <Ban className="h-4 w-4 mr-2" />
-                                    Suspend
-                                  </DropdownMenuItem>
-                                )}
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className="w-full">
+                                        <DropdownMenuItem 
+                                          className={(moderator.is_suspended || !moderator.is_active) ? "cursor-pointer" : "cursor-not-allowed opacity-50"} 
+                                          onClick={() => {
+                                            if (moderator.is_suspended || !moderator.is_active) {
+                                              handleReinstateUser(moderator);
+                                            }
+                                          }}
+                                          disabled={!moderator.is_suspended && moderator.is_active}
+                                          onSelect={(e) => {
+                                            if (!moderator.is_suspended && moderator.is_active) {
+                                              e.preventDefault();
+                                            }
+                                          }}
+                                        >
+                                          <Unlock className="h-4 w-4 mr-2" />
+                                          Reinstate
+                                        </DropdownMenuItem>
+                                      </span>
+                                    </TooltipTrigger>
+                                    {!moderator.is_suspended && moderator.is_active && (
+                                      <TooltipContent>
+                                        <p>User already reinstated</p>
+                                      </TooltipContent>
+                                    )}
+                                  </Tooltip>
+                                </TooltipProvider>
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className="w-full">
+                                        <DropdownMenuItem 
+                                          className={moderator.is_suspended ? "cursor-not-allowed opacity-50" : "cursor-pointer"} 
+                                          onClick={() => {
+                                            if (!moderator.is_suspended) {
+                                              setSuspendUserId(moderator.id || moderator.user_id);
+                                            }
+                                          }}
+                                          disabled={moderator.is_suspended}
+                                          onSelect={(e) => {
+                                            if (moderator.is_suspended) {
+                                              e.preventDefault();
+                                            }
+                                          }}
+                                        >
+                                          <Ban className="h-4 w-4 mr-2" />
+                                          Suspend
+                                        </DropdownMenuItem>
+                                      </span>
+                                    </TooltipTrigger>
+                                    {moderator.is_suspended && (
+                                      <TooltipContent>
+                                        <p>User already suspended</p>
+                                      </TooltipContent>
+                                    )}
+                                  </Tooltip>
+                                </TooltipProvider>
                                 <DropdownMenuItem className="cursor-pointer" onClick={() => setResetPasswordUserId(moderator.id || moderator.user_id)}>
                                   <KeyRound className="h-4 w-4 mr-2" />
                                   Reset Password
