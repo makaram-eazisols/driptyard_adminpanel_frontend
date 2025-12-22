@@ -673,7 +673,7 @@ function FlaggedContent() {
                                   <Eye className="h-4 w-4 mr-2" />
                                   View
                                 </DropdownMenuItem>
-                                {item.productStatus === "pending" ? (
+                                {item.status === "pending" ? (
                                   <>
                                     <DropdownMenuItem
                                       className="cursor-pointer"
@@ -700,21 +700,7 @@ function FlaggedContent() {
                                       Remove
                                     </DropdownMenuItem>
                                   </>
-                                ) : (
-                                  // <DropdownMenuItem
-                                  //   className="cursor-pointer"
-                                  //   onClick={() => handleReReview(item)}
-                                  //   disabled={loadingActions[`review-${item.reportId}`]}
-                                  // >
-                                  //   {loadingActions[`review-${item.reportId}`] ? (
-                                  //     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                  //   ) : (
-                                  //     <Check className="h-4 w-4 mr-2" />
-                                  //   )}
-                                  //   Review Again
-                                  // </DropdownMenuItem>
-                                  <></>
-                                )}
+                                ) : null}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </TableCell>
