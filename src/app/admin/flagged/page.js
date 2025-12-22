@@ -650,8 +650,8 @@ function FlaggedContent() {
                           </p>
                         </TableCell>
                         <TableCell className="py-3 px-4 max-w-[120px]">
-                          <Badge variant={getProductStatusBadgeVariant(item.productStatus)} className="text-xs">
-                            {getProductStatusText(item.productStatus)}
+                          <Badge variant={getProductStatusBadgeVariant(item.status)} className="text-xs">
+                            {getProductStatusText(item.status)}
                           </Badge>
                         </TableCell>
                         <TableCell className="py-3 px-4 max-w-[150px]">
@@ -673,7 +673,7 @@ function FlaggedContent() {
                                   <Eye className="h-4 w-4 mr-2" />
                                   View
                                 </DropdownMenuItem>
-                                {isPending(item.status) ? (
+                                {item.productStatus === "pending" ? (
                                   <>
                                     <DropdownMenuItem
                                       className="cursor-pointer"
