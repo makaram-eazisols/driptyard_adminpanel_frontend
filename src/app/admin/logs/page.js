@@ -9,10 +9,11 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { FileText, Loader2, Filter, X, ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
+import { FileText, Loader2, Filter, X, ChevronLeft, ChevronRight, CalendarDays, MoreHorizontal } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { apiClient } from "@/lib/api-client";
 import { notifyError } from "@/lib/toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -66,9 +67,9 @@ function Logs() {
         page: 1,
         page_size: 1, // Just need the available_actions field
       };
-      
+
       const data = await apiClient.getAdminLogs(params);
-      
+
       if (data.available_actions && Array.isArray(data.available_actions) && data.available_actions.length > 0) {
         setAvailableActions(data.available_actions.sort());
         setActionsLoaded(true);
@@ -102,16 +103,16 @@ function Logs() {
       }
 
       const data = await apiClient.getAdminLogs(params);
-      
+
       // Extract logs data
       const logsData = data.logs || data.items || [];
-      
+
       // Update available_actions if not loaded yet (fallback)
       if (!actionsLoaded && data.available_actions && Array.isArray(data.available_actions) && data.available_actions.length > 0) {
         setAvailableActions(data.available_actions.sort());
         setActionsLoaded(true);
       }
-      
+
       setLogs(logsData);
       setTotalPages(data.total_pages || 1);
       setTotalCount(data.total || logsData.length || 0);
@@ -139,6 +140,59 @@ function Logs() {
     { value: "admin", label: "Admin" },
     { value: "moderator", label: "Moderator" },
   ];
+
+  const renderTarget = (target) => {
+    if (!target || target === "N/A") return "N/A";
+
+    // Ensure it's a string, then split by comma
+    const targetStr = String(target);
+    const items = targetStr.split(",").map(item => item.trim());
+
+    if (items.length <= 3) return targetStr;
+
+    // If more than 5, show first 3 and then the three dots
+    const displayItems = items.slice(0, 3).join(", ");
+
+    return (
+      <TooltipProvider delayDuration={300}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="inline-flex items-center gap-1 cursor-pointer group">
+              <span className="text-sm">
+                {displayItems}
+              </span>
+              <div className="flex items-center justify-center bg-muted/50 rounded p-0.5 group-hover:bg-muted transition-colors">
+                <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
+              </div>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent
+            side="top"
+            className="max-w-[350px] p-4 bg-white text-zinc-950 border border-border shadow-xl rounded-xl"
+          >
+            <div className="space-y-3">
+              <div className="flex items-center justify-between border-b border-zinc-100 pb-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                  Target List ({items.length})
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-1.5 max-h-[200px] overflow-y-auto pr-1">
+                {items.map((item, idx) => (
+                  <Badge
+                    key={idx}
+                    variant="outline"
+                    className="bg-zinc-50 text-zinc-700 border-zinc-200 font-medium py-0.5 px-2 text-[11px] hover:bg-zinc-100 transition-colors"
+                  >
+                    {item}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  };
 
   return (
     <ProtectedRoute>
@@ -301,7 +355,7 @@ function Logs() {
                         </TableCell>
                         <TableCell className="px-4 py-3">
                           <div className="text-sm text-foreground">
-                            {log.target || log.target_id || log.target_name || "N/A"}
+                            {renderTarget(log.target || log.target_id || log.target_name)}
                           </div>
                         </TableCell>
                       </TableRow>

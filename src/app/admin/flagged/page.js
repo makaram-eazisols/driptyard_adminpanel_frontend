@@ -39,7 +39,7 @@ function FlaggedContent() {
   const { user } = useAuth();
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
-  const [status, setStatus] = useState("all");
+  const [status, setStatus] = useState("pending");
   const [priceSort, setPriceSort] = useState("none");
   const [reportCountSort, setReportCountSort] = useState("none");
   const [showFilters, setShowFilters] = useState(false);
@@ -87,7 +87,7 @@ function FlaggedContent() {
     // 0 = pending, 1 = approved, 2 = rejected
     let productStatus = "pending";
     const flaggedValue = item.product_is_flagged;
-    
+
     if (flaggedValue === 1) {
       productStatus = "approved";
     } else if (flaggedValue === 2) {
@@ -108,7 +108,7 @@ function FlaggedContent() {
       reason: item.latest_report_reason || "No reason provided",
       date: formatDate(item.latest_report_created_at || item.first_reported_at),
       status: item.latest_report_status || "pending",
-      productStatus: productStatus, // Status based on product_is_flagged
+      productStatus: item.latest_report_status || "pending", // Sync with latest_report_status
       image: item.product_images && item.product_images.length > 0 ? item.product_images[0] : "",
       images: item.product_images || [],
       reportCount: item.report_count || 0,
@@ -128,9 +128,9 @@ function FlaggedContent() {
     if (!dateString) return "N/A";
     try {
       const date = new Date(dateString);
-      return date.toLocaleString("en-US", { 
-        year: "numeric", 
-        month: "short", 
+      return date.toLocaleString("en-US", {
+        year: "numeric",
+        month: "short",
         day: "numeric",
         hour: "2-digit",
         minute: "2-digit"
@@ -189,19 +189,18 @@ function FlaggedContent() {
         page: currentPage,
         page_size: pageSize,
         search: searchTerm || undefined,
+        status: status || undefined,
       };
 
       const data = await apiClient.getAdminReports(params);
       let items = data.reports || [];
-      
+
       const normalizedItems = items.map(normalizeFlaggedItem);
-      
-      // Filter by status if not "all"
-      let filteredItems = normalizedItems;
-      if (status && status !== "all") {
-        filteredItems = normalizedItems.filter(item => item.productStatus === status);
-      }
-      
+
+      // The API already filters by status, so we don't need to filter again on the frontend.
+      // Filtering again on the frontend can cause items with mismatched product_is_flagged values to be hidden.
+      const filteredItems = normalizedItems;
+
       const sortedItems = applySorting(filteredItems);
       setFlaggedContent(sortedItems);
       setTotalPages(data.total_pages || 1);
@@ -329,7 +328,11 @@ function FlaggedContent() {
   // Bulk selection handlers
   const handleSelectAll = (checked) => {
     if (checked) {
-      setSelectedItems(new Set(flaggedContent.map((item) => item.reportId)));
+      // Only select items that are actually pending to be safe
+      const pendingIds = flaggedContent
+        .filter(item => item.productStatus === "pending")
+        .map((item) => item.reportId);
+      setSelectedItems(new Set(pendingIds));
     } else {
       setSelectedItems(new Set());
     }
@@ -345,8 +348,29 @@ function FlaggedContent() {
     setSelectedItems(newSelected);
   };
 
-  const isAllSelected = flaggedContent.length > 0 && selectedItems.size === flaggedContent.length;
-  const isIndeterminate = selectedItems.size > 0 && selectedItems.size < flaggedContent.length;
+  const pendingItemsInView = flaggedContent.filter(item => item.productStatus === "pending");
+  const isAllSelected = pendingItemsInView.length > 0 && selectedItems.size === pendingItemsInView.length;
+  const isIndeterminate = selectedItems.size > 0 && selectedItems.size < pendingItemsInView.length;
+
+  // Check if all selected items have a specific status
+  const getSelectedItemsStatuses = () => {
+    const selectedReportIds = Array.from(selectedItems);
+    return flaggedContent
+      .filter(item => selectedReportIds.includes(item.reportId))
+      .map(item => item.productStatus);
+  };
+
+  const areAllSelectedApproved = () => {
+    if (selectedItems.size === 0) return false;
+    const statuses = getSelectedItemsStatuses();
+    return statuses.length > 0 && statuses.every(status => status === "approved");
+  };
+
+  const areAllSelectedRejected = () => {
+    if (selectedItems.size === 0) return false;
+    const statuses = getSelectedItemsStatuses();
+    return statuses.length > 0 && statuses.every(status => status === "rejected");
+  };
 
   // Bulk action handlers
   const handleBulkApprove = async () => {
@@ -510,26 +534,30 @@ function FlaggedContent() {
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setBulkApproveDialog(true)}
-                    disabled={bulkActionLoading}
-                    className="text-green-600 hover:text-green-700"
-                  >
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    Approve
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setBulkRejectDialog(true)}
-                    disabled={bulkActionLoading}
-                    className="text-red-600 hover:text-red-700"
-                  >
-                    <XCircle className="h-4 w-4 mr-2" />
-                    Reject
-                  </Button>
+                  {getSelectedItemsStatuses().every(s => s === "pending") && (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setBulkApproveDialog(true)}
+                        disabled={bulkActionLoading}
+                        className="text-green-600 hover:text-green-700"
+                      >
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Approve
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setBulkRejectDialog(true)}
+                        disabled={bulkActionLoading}
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        <XCircle className="h-4 w-4 mr-2" />
+                        Reject
+                      </Button>
+                    </>
+                  )}
                   <Button
                     variant="ghost"
                     size="sm"
@@ -547,7 +575,7 @@ function FlaggedContent() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/50 hover:bg-muted/50">
-                    {canManageFlaggedContent && (
+                    {canManageFlaggedContent && pendingItemsInView.length > 0 && (
                       <TableHead className="h-12 px-4 w-12">
                         <Checkbox
                           checked={isAllSelected}
@@ -583,7 +611,7 @@ function FlaggedContent() {
                       baseUrl = `${baseUrl}/products`;
                     }
                     const productUrl = productId ? `${baseUrl}/${productId}` : null;
-                    
+
                     const handleRowClick = () => {
                       if (productUrl) {
                         window.open(productUrl, "_blank");
@@ -591,17 +619,22 @@ function FlaggedContent() {
                     };
 
                     return (
-                      <TableRow 
-                        key={item.id} 
+                      <TableRow
+                        key={item.id}
                         className={`hover:bg-muted/30 transition-colors ${productUrl ? "cursor-pointer" : ""}`}
                         onDoubleClick={productUrl ? handleRowClick : undefined}
                       >
-                        {canManageFlaggedContent && (
+                        {canManageFlaggedContent && item.productStatus === "pending" && (
                           <TableCell className="py-3 px-4">
                             <Checkbox
                               checked={selectedItems.has(item.reportId)}
                               onCheckedChange={(checked) => handleSelectItem(item.reportId, checked)}
                             />
+                          </TableCell>
+                        )}
+                        {canManageFlaggedContent && item.productStatus !== "pending" && pendingItemsInView.length > 0 && (
+                          <TableCell className="py-3 px-4">
+                            {/* Empty cell to maintain layout when other rows have checkboxes */}
                           </TableCell>
                         )}
                         <TableCell className="py-3 px-4 max-w-[100px]">
@@ -621,9 +654,9 @@ function FlaggedContent() {
                         </TableCell>
                         <TableCell className="py-3 px-4 max-w-[250px]">
                           {productUrl ? (
-                            <a 
-                              href={productUrl} 
-                              target="_blank" 
+                            <a
+                              href={productUrl}
+                              target="_blank"
                               rel="noopener noreferrer"
                               className="font-semibold text-sm text-primary leading-tight break-words hover:text-accent transition-colors"
                               onClick={(e) => {
@@ -827,7 +860,7 @@ function FlaggedContent() {
                           {viewItem.all_reports.map((report) => (
                             <TableRow key={report.id} className="hover:bg-muted/30 transition-colors">
                               <TableCell className="py-3 px-4">
-                                <p 
+                                <p
                                   className="text-sm font-medium text-primary hover:text-accent transition-colors cursor-pointer"
                                   onClick={() => handleViewUser(report.user_id)}
                                   title="Click to view user details"

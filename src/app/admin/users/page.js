@@ -84,10 +84,8 @@ function Users() {
   const [showCreatePassword, setShowCreatePassword] = useState(false);
   const [selectedUsers, setSelectedUsers] = useState(new Set());
   const [bulkDeleteDialog, setBulkDeleteDialog] = useState(false);
-  const [bulkStatusDialog, setBulkStatusDialog] = useState(false);
   const [bulkSuspendDialog, setBulkSuspendDialog] = useState(false);
   const [bulkReinstateDialog, setBulkReinstateDialog] = useState(false);
-  const [bulkStatusValue, setBulkStatusValue] = useState("active");
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
 
   // Check manage users permission
@@ -122,7 +120,7 @@ function Users() {
       const data = await apiClient.getAdminUsers(params);
       // Filter out admins and moderators on client side
       let customerUsers = (data.users || []).filter((user) => !user.is_admin && !user.is_moderator);
-      
+
       // Apply client-side status filtering if needed
       if (status === "active") {
         customerUsers = customerUsers.filter((user) => user.is_active && !user.is_banned && user.is_verified);
@@ -131,7 +129,7 @@ function Users() {
       } else if (status === "isSuspend") {
         customerUsers = customerUsers.filter((user) => user.is_suspended);
       }
-      
+
       // Apply sorting
       const sortedUsers = applySorting(customerUsers);
       setUsers(sortedUsers);
@@ -203,7 +201,6 @@ function Users() {
   const STATUS_OPTIONS = [
     { value: "all", label: "All Status" },
     { value: "active", label: "Active" },
-    { value: "inactive", label: "Inactive" },
     { value: "isSuspend", label: "Suspended" },
   ];
 
@@ -214,7 +211,7 @@ function Users() {
     setIsEditDialogOpen(true);
     setActiveTab("user-edit");
     setPermissionsForm(null);
-    
+
     // Load permissions if user is a moderator
     if (user.is_moderator || user.role === "moderator") {
       setPermissionsLoading(true);
@@ -503,25 +500,7 @@ function Users() {
     }
   };
 
-  const handleBulkStatusChange = async () => {
-    if (selectedUsers.size === 0) return;
 
-    setBulkActionLoading(true);
-    try {
-      const userIds = Array.from(selectedUsers).map(id => parseInt(id, 10));
-      const isActive = bulkStatusValue === "active";
-      const response = await apiClient.bulkUpdateUserStatus(userIds, isActive);
-      notifySuccess(response.message || `${selectedUsers.size} user(s) status updated successfully`);
-      setSelectedUsers(new Set());
-      setBulkStatusDialog(false);
-      fetchUsers();
-    } catch (error) {
-      console.error("Failed to update user status:", error);
-      notifyError(error.response?.data?.detail || "Failed to update user status");
-    } finally {
-      setBulkActionLoading(false);
-    }
-  };
 
   const handleBulkSuspend = async () => {
     if (selectedUsers.size === 0) return;
@@ -568,7 +547,7 @@ function Users() {
         // Extract country code from phone value (format: +1234567890 or +1 234567890)
         let extractedCountryCode = "";
         let phoneNumber = value;
-        
+
         // Remove spaces and extract country code
         const cleanValue = value.replace(/\s/g, "");
         const match = cleanValue.match(/^\+(\d{1,3})/);
@@ -809,14 +788,6 @@ function Users() {
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setBulkStatusDialog(true)}
-                      disabled={bulkActionLoading}
-                    >
-                      Change Status
-                    </Button>
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -920,7 +891,7 @@ function Users() {
                           </TableCell>
                         )}
                         <TableCell className="py-3 px-4">
-                          <p 
+                          <p
                             className="font-semibold text-sm text-primary leading-tight cursor-pointer hover:text-accent transition-colors"
                             onDoubleClick={() => handleUsernameDoubleClick(user)}
                             title="Double-click to view details"
@@ -961,8 +932,8 @@ function Users() {
                                   <Tooltip>
                                     <TooltipTrigger asChild>
                                       <span className="w-full">
-                                        <DropdownMenuItem 
-                                          className={user.is_suspended ? "cursor-pointer" : "cursor-not-allowed opacity-50"} 
+                                        <DropdownMenuItem
+                                          className={user.is_suspended ? "cursor-pointer" : "cursor-not-allowed opacity-50"}
                                           onClick={() => {
                                             if (user.is_suspended) {
                                               handleUnsuspendUser(user.id);
@@ -991,8 +962,8 @@ function Users() {
                                   <Tooltip>
                                     <TooltipTrigger asChild>
                                       <span className="w-full">
-                                        <DropdownMenuItem 
-                                          className={user.is_suspended ? "cursor-not-allowed opacity-50" : "cursor-pointer"} 
+                                        <DropdownMenuItem
+                                          className={user.is_suspended ? "cursor-not-allowed opacity-50" : "cursor-pointer"}
                                           onClick={() => {
                                             if (!user.is_suspended) {
                                               setSuspendUserId(user.id);
@@ -1074,8 +1045,8 @@ function Users() {
 
       {/* Edit User Dialog */}
       {canManageUsers && (
-        <Dialog 
-          open={isEditDialogOpen} 
+        <Dialog
+          open={isEditDialogOpen}
           onOpenChange={(open) => {
             setIsEditDialogOpen(open);
             if (!open) {
@@ -1085,54 +1056,54 @@ function Users() {
             }
           }}
         >
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto" onOpenAutoFocus={(e) => e.preventDefault()}>
-          <DialogHeader>
-            <DialogTitle>Edit User</DialogTitle>
-          </DialogHeader>
-          {editUser && (
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="user-edit">User Edit</TabsTrigger>
-                <TabsTrigger value="permissions" disabled={!editUser.is_moderator && editUser.role !== "moderator"}>
-                  Permissions
-                </TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="user-edit" className="space-y-4 py-4">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="grid gap-2">
-                    <Label htmlFor="first-name">First Name</Label>
-                    <Input
-                      id="first-name"
-                      value={editUser.first_name || ""}
-                      onChange={(e) => setEditUser({ ...editUser, first_name: e.target.value })}
-                    />
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto" onOpenAutoFocus={(e) => e.preventDefault()}>
+            <DialogHeader>
+              <DialogTitle>Edit User</DialogTitle>
+            </DialogHeader>
+            {editUser && (
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="user-edit">User Edit</TabsTrigger>
+                  <TabsTrigger value="permissions" disabled={!editUser.is_moderator && editUser.role !== "moderator"}>
+                    Permissions
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="user-edit" className="space-y-4 py-4">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="grid gap-2">
+                      <Label htmlFor="first-name">First Name</Label>
+                      <Input
+                        id="first-name"
+                        value={editUser.first_name || ""}
+                        onChange={(e) => setEditUser({ ...editUser, first_name: e.target.value })}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="last-name">Last Name</Label>
+                      <Input
+                        id="last-name"
+                        value={editUser.last_name || ""}
+                        onChange={(e) => setEditUser({ ...editUser, last_name: e.target.value })}
+                      />
+                    </div>
                   </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="last-name">Last Name</Label>
-                    <Input
-                      id="last-name"
-                      value={editUser.last_name || ""}
-                      onChange={(e) => setEditUser({ ...editUser, last_name: e.target.value })}
-                    />
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="grid gap-2">
+                      <Label htmlFor="username">Username</Label>
+                      <Input
+                        id="username"
+                        value={editUser.username || ""}
+                        onChange={(e) => setEditUser({ ...editUser, username: e.target.value })}
+                      />
+                      <p className="text-xs text-muted-foreground">Only letters, numbers, underscores, and hyphens are allowed</p>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="email">Email</Label>
+                      <Input id="email" type="email" value={editUser.email || ""} disabled />
+                    </div>
                   </div>
-                </div>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="grid gap-2">
-                    <Label htmlFor="username">Username</Label>
-                    <Input
-                      id="username"
-                      value={editUser.username || ""}
-                      onChange={(e) => setEditUser({ ...editUser, username: e.target.value })}
-                    />
-                    <p className="text-xs text-muted-foreground">Only letters, numbers, underscores, and hyphens are allowed</p>
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input id="email" type="email" value={editUser.email || ""} disabled />
-                  </div>
-                </div>
-                {/* <div className="flex items-center justify-between">
+                  {/* <div className="flex items-center justify-between">
                   <Label htmlFor="is-active">Active</Label>
                   <Switch
                     id="is-active"
@@ -1140,246 +1111,246 @@ function Users() {
                     onCheckedChange={(checked) => setEditUser({ ...editUser, is_active: checked })}
                   />
                 </div> */}
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="is-verified">Verified</Label>
-                  <Switch
-                    id="is-verified"
-                    checked={!!editUser.is_verified}
-                    onCheckedChange={(checked) => setEditUser({ ...editUser, is_verified: checked })}
-                  />
-                </div>
-                <div className="flex justify-end gap-2 pt-4">
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setIsEditDialogOpen(false);
-                      setEditUser(null);
-                      setActiveTab("user-edit");
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                  <Button onClick={handleSaveUser} className="gradient-driptyard-hover text-white" disabled={editLoading}>
-                    {editLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                    Save Changes
-                  </Button>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="permissions" className="space-y-4 py-4">
-                {permissionsLoading ? (
-                  <div className="space-y-2 py-4">
-                    {[1, 2, 3, 4, 5].map((i) => (
-                      <Skeleton key={i} className="h-12 w-full" />
-                    ))}
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="is-verified">Verified</Label>
+                    <Switch
+                      id="is-verified"
+                      checked={!!editUser.is_verified}
+                      onCheckedChange={(checked) => setEditUser({ ...editUser, is_verified: checked })}
+                    />
                   </div>
-                ) : !permissionsForm ? (
-                  <p className="text-sm text-muted-foreground py-2">
-                    No permissions found for this user.
-                  </p>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="rounded-lg border border-border overflow-hidden">
-                      <Table>
-                        <TableHeader>
-                          <TableRow className="bg-muted/50 hover:bg-muted/50">
-                            <TableHead className="h-12 px-4 font-semibold text-secondary">
-                              Role Name
-                            </TableHead>
-                            <TableHead className="h-12 px-4 text-center font-semibold text-secondary">
-                              Read
-                            </TableHead>
-                            <TableHead className="h-12 px-4 text-center font-semibold text-secondary">
-                              Manage
-                            </TableHead>
-                            <TableHead className="h-12 px-4 text-center font-semibold text-secondary">
-                              Create
-                            </TableHead>
-                            <TableHead className="h-12 px-4 text-center font-semibold text-secondary">
-                              Delete
-                            </TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {/* Users */}
-                          <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="py-3 px-4 font-medium text-sm">Users</TableCell>
-                            <TableCell className="py-3 px-4 text-center">
-                              <Checkbox
-                                checked={!!permissionsForm.can_see_users}
-                                onCheckedChange={() => handleTogglePermission("can_see_users")}
-                              />
-                            </TableCell>
-                            <TableCell className="py-3 px-4 text-center">
-                              <Checkbox
-                                checked={!!permissionsForm.can_manage_users}
-                                onCheckedChange={() => handleTogglePermission("can_manage_users")}
-                                disabled={!permissionsForm.can_see_users}
-                              />
-                            </TableCell>
-                            <TableCell className="py-3 px-4 text-center">
-                              <span className="text-muted-foreground">—</span>
-                            </TableCell>
-                            <TableCell className="py-3 px-4 text-center">
-                              <span className="text-muted-foreground">—</span>
-                            </TableCell>
-                          </TableRow>
-
-                          {/* Listings */}
-                          <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="py-3 px-4 font-medium text-sm">Listings</TableCell>
-                            <TableCell className="py-3 px-4 text-center">
-                              <Checkbox
-                                checked={!!permissionsForm.can_see_listings}
-                                onCheckedChange={() => handleTogglePermission("can_see_listings")}
-                              />
-                            </TableCell>
-                            <TableCell className="py-3 px-4 text-center">
-                              <Checkbox
-                                checked={!!permissionsForm.can_manage_listings}
-                                onCheckedChange={() => handleTogglePermission("can_manage_listings")}
-                                disabled={!permissionsForm.can_see_listings}
-                              />
-                            </TableCell>
-                            <TableCell className="py-3 px-4 text-center">
-                              <span className="text-muted-foreground">—</span>
-                            </TableCell>
-                            <TableCell className="py-3 px-4 text-center">
-                              <span className="text-muted-foreground">—</span>
-                            </TableCell>
-                          </TableRow>
-
-                          {/* Spotlight History */}
-                          <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="py-3 px-4 font-medium text-sm">
-                              Spotlight History
-                            </TableCell>
-                            <TableCell className="py-3 px-4 text-center">
-                              <Checkbox
-                                checked={!!permissionsForm.can_see_spotlight_history}
-                                onCheckedChange={() =>
-                                  handleTogglePermission("can_see_spotlight_history")
-                                }
-                              />
-                            </TableCell>
-                            <TableCell className="py-3 px-4 text-center">
-                              <span className="text-muted-foreground">—</span>
-                            </TableCell>
-                            <TableCell className="py-3 px-4 text-center">
-                              <Checkbox
-                                checked={!!permissionsForm.can_spotlight}
-                                onCheckedChange={() => handleTogglePermission("can_spotlight")}
-                                disabled={!permissionsForm.can_see_spotlight_history}
-                              />
-                            </TableCell>
-                            <TableCell className="py-3 px-4 text-center">
-                              <Checkbox
-                                checked={!!permissionsForm.can_remove_spotlight}
-                                onCheckedChange={() => handleTogglePermission("can_remove_spotlight")}
-                                disabled={!permissionsForm.can_see_spotlight_history}
-                              />
-                            </TableCell>
-                          </TableRow>
-
-                          {/* Flagged Content */}
-                          <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="py-3 px-4 font-medium text-sm">Flagged Content</TableCell>
-                            <TableCell className="py-3 px-4 text-center">
-                              <Checkbox
-                                checked={!!permissionsForm.can_see_flagged_content}
-                                onCheckedChange={() => handleTogglePermission("can_see_flagged_content")}
-                              />
-                            </TableCell>
-                            <TableCell className="py-3 px-4 text-center">
-                              <Checkbox
-                                checked={!!permissionsForm.can_manage_flagged_content}
-                                onCheckedChange={() =>
-                                  handleTogglePermission("can_manage_flagged_content")
-                                }
-                                disabled={!permissionsForm.can_see_flagged_content}
-                              />
-                            </TableCell>
-                            <TableCell className="py-3 px-4 text-center">
-                              <span className="text-muted-foreground">—</span>
-                            </TableCell>
-                            <TableCell className="py-3 px-4 text-center">
-                              <span className="text-muted-foreground">—</span>
-                            </TableCell>
-                          </TableRow>
-                        </TableBody>
-                      </Table>
-                    </div>
-
-                    <div className="flex justify-end pt-4 gap-2 border-t border-border">
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          setIsEditDialogOpen(false);
-                          setEditUser(null);
-                          setActiveTab("user-edit");
-                        }}
-                        disabled={savingPermissions}
-                      >
-                        Cancel
-                      </Button>
-                      <Button onClick={handleSavePermissions} disabled={savingPermissions} className="gradient-driptyard-hover text-white">
-                        {savingPermissions && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                        {savingPermissions ? "Saving..." : "Save Permissions"}
-                      </Button>
-                    </div>
+                  <div className="flex justify-end gap-2 pt-4">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setIsEditDialogOpen(false);
+                        setEditUser(null);
+                        setActiveTab("user-edit");
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button onClick={handleSaveUser} className="gradient-driptyard-hover text-white" disabled={editLoading}>
+                      {editLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                      Save Changes
+                    </Button>
                   </div>
-                )}
-              </TabsContent>
-            </Tabs>
-          )}
-        </DialogContent>
-      </Dialog>
+                </TabsContent>
+
+                <TabsContent value="permissions" className="space-y-4 py-4">
+                  {permissionsLoading ? (
+                    <div className="space-y-2 py-4">
+                      {[1, 2, 3, 4, 5].map((i) => (
+                        <Skeleton key={i} className="h-12 w-full" />
+                      ))}
+                    </div>
+                  ) : !permissionsForm ? (
+                    <p className="text-sm text-muted-foreground py-2">
+                      No permissions found for this user.
+                    </p>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="rounded-lg border border-border overflow-hidden">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="bg-muted/50 hover:bg-muted/50">
+                              <TableHead className="h-12 px-4 font-semibold text-secondary">
+                                Role Name
+                              </TableHead>
+                              <TableHead className="h-12 px-4 text-center font-semibold text-secondary">
+                                Read
+                              </TableHead>
+                              <TableHead className="h-12 px-4 text-center font-semibold text-secondary">
+                                Manage
+                              </TableHead>
+                              <TableHead className="h-12 px-4 text-center font-semibold text-secondary">
+                                Create
+                              </TableHead>
+                              <TableHead className="h-12 px-4 text-center font-semibold text-secondary">
+                                Delete
+                              </TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {/* Users */}
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                              <TableCell className="py-3 px-4 font-medium text-sm">Users</TableCell>
+                              <TableCell className="py-3 px-4 text-center">
+                                <Checkbox
+                                  checked={!!permissionsForm.can_see_users}
+                                  onCheckedChange={() => handleTogglePermission("can_see_users")}
+                                />
+                              </TableCell>
+                              <TableCell className="py-3 px-4 text-center">
+                                <Checkbox
+                                  checked={!!permissionsForm.can_manage_users}
+                                  onCheckedChange={() => handleTogglePermission("can_manage_users")}
+                                  disabled={!permissionsForm.can_see_users}
+                                />
+                              </TableCell>
+                              <TableCell className="py-3 px-4 text-center">
+                                <span className="text-muted-foreground">—</span>
+                              </TableCell>
+                              <TableCell className="py-3 px-4 text-center">
+                                <span className="text-muted-foreground">—</span>
+                              </TableCell>
+                            </TableRow>
+
+                            {/* Listings */}
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                              <TableCell className="py-3 px-4 font-medium text-sm">Listings</TableCell>
+                              <TableCell className="py-3 px-4 text-center">
+                                <Checkbox
+                                  checked={!!permissionsForm.can_see_listings}
+                                  onCheckedChange={() => handleTogglePermission("can_see_listings")}
+                                />
+                              </TableCell>
+                              <TableCell className="py-3 px-4 text-center">
+                                <Checkbox
+                                  checked={!!permissionsForm.can_manage_listings}
+                                  onCheckedChange={() => handleTogglePermission("can_manage_listings")}
+                                  disabled={!permissionsForm.can_see_listings}
+                                />
+                              </TableCell>
+                              <TableCell className="py-3 px-4 text-center">
+                                <span className="text-muted-foreground">—</span>
+                              </TableCell>
+                              <TableCell className="py-3 px-4 text-center">
+                                <span className="text-muted-foreground">—</span>
+                              </TableCell>
+                            </TableRow>
+
+                            {/* Spotlight History */}
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                              <TableCell className="py-3 px-4 font-medium text-sm">
+                                Spotlight History
+                              </TableCell>
+                              <TableCell className="py-3 px-4 text-center">
+                                <Checkbox
+                                  checked={!!permissionsForm.can_see_spotlight_history}
+                                  onCheckedChange={() =>
+                                    handleTogglePermission("can_see_spotlight_history")
+                                  }
+                                />
+                              </TableCell>
+                              <TableCell className="py-3 px-4 text-center">
+                                <span className="text-muted-foreground">—</span>
+                              </TableCell>
+                              <TableCell className="py-3 px-4 text-center">
+                                <Checkbox
+                                  checked={!!permissionsForm.can_spotlight}
+                                  onCheckedChange={() => handleTogglePermission("can_spotlight")}
+                                  disabled={!permissionsForm.can_see_spotlight_history}
+                                />
+                              </TableCell>
+                              <TableCell className="py-3 px-4 text-center">
+                                <Checkbox
+                                  checked={!!permissionsForm.can_remove_spotlight}
+                                  onCheckedChange={() => handleTogglePermission("can_remove_spotlight")}
+                                  disabled={!permissionsForm.can_see_spotlight_history}
+                                />
+                              </TableCell>
+                            </TableRow>
+
+                            {/* Flagged Content */}
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                              <TableCell className="py-3 px-4 font-medium text-sm">Flagged Content</TableCell>
+                              <TableCell className="py-3 px-4 text-center">
+                                <Checkbox
+                                  checked={!!permissionsForm.can_see_flagged_content}
+                                  onCheckedChange={() => handleTogglePermission("can_see_flagged_content")}
+                                />
+                              </TableCell>
+                              <TableCell className="py-3 px-4 text-center">
+                                <Checkbox
+                                  checked={!!permissionsForm.can_manage_flagged_content}
+                                  onCheckedChange={() =>
+                                    handleTogglePermission("can_manage_flagged_content")
+                                  }
+                                  disabled={!permissionsForm.can_see_flagged_content}
+                                />
+                              </TableCell>
+                              <TableCell className="py-3 px-4 text-center">
+                                <span className="text-muted-foreground">—</span>
+                              </TableCell>
+                              <TableCell className="py-3 px-4 text-center">
+                                <span className="text-muted-foreground">—</span>
+                              </TableCell>
+                            </TableRow>
+                          </TableBody>
+                        </Table>
+                      </div>
+
+                      <div className="flex justify-end pt-4 gap-2 border-t border-border">
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setIsEditDialogOpen(false);
+                            setEditUser(null);
+                            setActiveTab("user-edit");
+                          }}
+                          disabled={savingPermissions}
+                        >
+                          Cancel
+                        </Button>
+                        <Button onClick={handleSavePermissions} disabled={savingPermissions} className="gradient-driptyard-hover text-white">
+                          {savingPermissions && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                          {savingPermissions ? "Saving..." : "Save Permissions"}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
+            )}
+          </DialogContent>
+        </Dialog>
       )}
 
       {/* Delete Confirmation Dialog */}
       {canManageUsers && (
         <AlertDialog open={!!deleteUserId} onOpenChange={() => setDeleteUserId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Permanently Delete User?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete this user and all associated data including their listings. This action cannot be undone. The deletion will be recorded in the system logs for auditing purposes.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteUser}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Delete Permanently
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Permanently Delete User?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently delete this user and all associated data including their listings. This action cannot be undone. The deletion will be recorded in the system logs for auditing purposes.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteUser}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Delete Permanently
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       )}
 
       {/* Suspend Confirmation Dialog */}
       {canManageUsers && (
         <AlertDialog open={!!suspendUserId} onOpenChange={() => setSuspendUserId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Suspend User?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will suspend the user's account. They will be notified via email and will not be able to access their account until reinstated.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleSuspendUser}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Suspend
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Suspend User?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will suspend the user's account. They will be notified via email and will not be able to access their account until reinstated.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleSuspendUser}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Suspend
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       )}
 
       {/* Reset Password Dialog */}
@@ -1721,47 +1692,8 @@ function Users() {
         </AlertDialog>
       )}
 
-      {/* Bulk Status Change Dialog */}
-      {canManageUsers && (
-        <Dialog open={bulkStatusDialog} onOpenChange={setBulkStatusDialog}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Change Status for {selectedUsers.size} User(s)</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="grid gap-2">
-                <Label>New Status</Label>
-                <Select value={bulkStatusValue} onValueChange={setBulkStatusValue}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="inactive">Inactive</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 pt-4 border-t border-border">
-              <Button
-                variant="outline"
-                onClick={() => setBulkStatusDialog(false)}
-                disabled={bulkActionLoading}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleBulkStatusChange}
-                className="gradient-driptyard-hover text-white"
-                disabled={bulkActionLoading}
-              >
-                {bulkActionLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                Update Status
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
+
+
 
       {/* Bulk Suspend Dialog */}
       {canManageUsers && (

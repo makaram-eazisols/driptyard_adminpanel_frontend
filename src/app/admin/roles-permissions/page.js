@@ -84,10 +84,8 @@ function RolesAndPermissions() {
   const [deleteUserId, setDeleteUserId] = useState(null);
   const [selectedModerators, setSelectedModerators] = useState(new Set());
   const [bulkDeleteDialog, setBulkDeleteDialog] = useState(false);
-  const [bulkStatusDialog, setBulkStatusDialog] = useState(false);
   const [bulkSuspendDialog, setBulkSuspendDialog] = useState(false);
   const [bulkReinstateDialog, setBulkReinstateDialog] = useState(false);
-  const [bulkStatusValue, setBulkStatusValue] = useState("active");
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
 
   // Fetch moderators
@@ -110,14 +108,14 @@ function RolesAndPermissions() {
 
       const response = await apiClient.getModerators(params);
       let items = response.moderators || [];
-      
+
       // Apply client-side status filtering if needed
       if (status === "active") {
         items = items.filter((moderator) => moderator.is_active !== false);
       } else if (status === "inactive") {
         items = items.filter((moderator) => moderator.is_active === false);
       }
-      
+
       // Apply sorting
       const sortedItems = applySorting(items);
       setModerators(sortedItems);
@@ -168,7 +166,6 @@ function RolesAndPermissions() {
   const STATUS_OPTIONS = [
     { value: "all", label: "All Status" },
     { value: "active", label: "Active" },
-    { value: "inactive", label: "Inactive" },
   ];
 
   const hasActiveFilters = searchQuery || (status && status !== "all") || joinDateSort !== "none";
@@ -321,7 +318,7 @@ function RolesAndPermissions() {
         // Extract country code from phone value (format: +1234567890 or +1 234567890)
         let extractedCountryCode = "";
         let phoneNumber = value;
-        
+
         // Remove spaces and extract country code
         const cleanValue = value.replace(/\s/g, "");
         const match = cleanValue.match(/^\+(\d{1,3})/);
@@ -397,13 +394,13 @@ function RolesAndPermissions() {
 
   const handleReinstateUser = async (moderator) => {
     const userId = moderator.id || moderator.user_id;
-    
+
     try {
       // If user is suspended, unsuspend them
       if (moderator.is_suspended) {
         await apiClient.unsuspendAdminUser(userId);
         notifySuccess("User has been reinstated. They will be notified via email.");
-      } 
+      }
       // If user is inactive, activate them
       else if (!moderator.is_active) {
         await apiClient.updateAdminUser(userId, {
@@ -536,25 +533,7 @@ function RolesAndPermissions() {
     }
   };
 
-  const handleBulkStatusChange = async () => {
-    if (selectedModerators.size === 0) return;
 
-    setBulkActionLoading(true);
-    try {
-      const moderatorIds = Array.from(selectedModerators).map(id => parseInt(id, 10));
-      const isActive = bulkStatusValue === "active";
-      const response = await apiClient.bulkUpdateUserStatus(moderatorIds, isActive);
-      notifySuccess(response.message || `${selectedModerators.size} moderator(s) status updated successfully`);
-      setSelectedModerators(new Set());
-      setBulkStatusDialog(false);
-      fetchModerators();
-    } catch (error) {
-      console.error("Failed to update moderator status:", error);
-      notifyError(error.response?.data?.detail || "Failed to update moderator status");
-    } finally {
-      setBulkActionLoading(false);
-    }
-  };
 
   const handleBulkSuspend = async () => {
     if (selectedModerators.size === 0) return;
@@ -654,10 +633,10 @@ function RolesAndPermissions() {
       };
 
       const createResponse = await apiClient.createAdminUser(payload);
-      
+
       // Extract moderator ID from response
       const moderatorId = createResponse.id || createResponse.user_id;
-      
+
       if (moderatorId) {
         // Set default permissions: can_see_dashboard = true, all others = false
         try {
@@ -673,7 +652,7 @@ function RolesAndPermissions() {
             can_see_flagged_content: false,
             can_manage_flagged_content: false,
           };
-          
+
           await apiClient.updateModeratorPermissions(moderatorId, defaultPermissions);
         } catch (permissionsError) {
           console.error("Failed to set default permissions:", permissionsError);
@@ -681,7 +660,7 @@ function RolesAndPermissions() {
           notifyError("Moderator created but failed to set default permissions. Please update permissions manually.");
         }
       }
-      
+
       notifySuccess("User created successfully");
       setIsCreateDialogOpen(false);
       setCreateUserForm({
@@ -705,7 +684,7 @@ function RolesAndPermissions() {
   return (
     <AdminLayout>
       <div className="space-y-2">
-          <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
               <h1 className="text-3xl font-bold text-secondary">Moderators</h1>
@@ -818,14 +797,6 @@ function RolesAndPermissions() {
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setBulkStatusDialog(true)}
-                      disabled={bulkActionLoading}
-                    >
-                      Change Status
-                    </Button>
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -979,8 +950,8 @@ function RolesAndPermissions() {
                                   <Tooltip>
                                     <TooltipTrigger asChild>
                                       <span className="w-full">
-                                        <DropdownMenuItem 
-                                          className={(moderator.is_suspended || !moderator.is_active) ? "cursor-pointer" : "cursor-not-allowed opacity-50"} 
+                                        <DropdownMenuItem
+                                          className={(moderator.is_suspended || !moderator.is_active) ? "cursor-pointer" : "cursor-not-allowed opacity-50"}
                                           onClick={() => {
                                             if (moderator.is_suspended || !moderator.is_active) {
                                               handleReinstateUser(moderator);
@@ -1009,8 +980,8 @@ function RolesAndPermissions() {
                                   <Tooltip>
                                     <TooltipTrigger asChild>
                                       <span className="w-full">
-                                        <DropdownMenuItem 
-                                          className={moderator.is_suspended ? "cursor-not-allowed opacity-50" : "cursor-pointer"} 
+                                        <DropdownMenuItem
+                                          className={moderator.is_suspended ? "cursor-not-allowed opacity-50" : "cursor-pointer"}
                                           onClick={() => {
                                             if (!moderator.is_suspended) {
                                               setSuspendUserId(moderator.id || moderator.user_id);
@@ -1063,9 +1034,9 @@ function RolesAndPermissions() {
                         {totalCount === 0
                           ? "0"
                           : `${(currentPage - 1) * pageSize + 1}-${Math.min(
-                              currentPage * pageSize,
-                              totalCount,
-                            )}`}
+                            currentPage * pageSize,
+                            totalCount,
+                          )}`}
                       </span>
                       <span className="ml-1 text-muted-foreground">of {totalCount}</span>
                     </div>
@@ -1092,8 +1063,8 @@ function RolesAndPermissions() {
           )}
         </div>
 
-        <Dialog 
-          open={permissionsDialogOpen} 
+        <Dialog
+          open={permissionsDialogOpen}
           onOpenChange={(open) => {
             setPermissionsDialogOpen(open);
             if (!open) {
@@ -1467,7 +1438,7 @@ function RolesAndPermissions() {
           </DialogContent>
         </Dialog>
 
-        {/* View User Details Dialog */}
+
         {canManageUsers && (
           <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
             <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
@@ -1747,98 +1718,59 @@ function RolesAndPermissions() {
           </AlertDialog>
         )}
 
-        {/* Bulk Status Change Dialog */}
-        {canManageUsers && (
-          <Dialog open={bulkStatusDialog} onOpenChange={setBulkStatusDialog}>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle>Change Status for {selectedModerators.size} Moderator(s)</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="grid gap-2">
-                  <Label>New Status</Label>
-                  <Select value={bulkStatusValue} onValueChange={setBulkStatusValue}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="inactive">Inactive</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="flex justify-end gap-2 pt-4 border-t border-border">
-                <Button
-                  variant="outline"
-                  onClick={() => setBulkStatusDialog(false)}
-                  disabled={bulkActionLoading}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleBulkStatusChange}
-                  className="gradient-driptyard-hover text-white"
-                  disabled={bulkActionLoading}
-                >
-                  {bulkActionLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  Update Status
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-        )}
 
-        {/* Bulk Suspend Dialog */}
-        {canManageUsers && (
-          <AlertDialog open={bulkSuspendDialog} onOpenChange={setBulkSuspendDialog}>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Suspend {selectedModerators.size} Moderator(s)?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This will suspend {selectedModerators.size} selected moderator account(s). They will be notified via email and will not be able to access their accounts until reinstated.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel disabled={bulkActionLoading}>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={handleBulkSuspend}
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  disabled={bulkActionLoading}
-                >
-                  {bulkActionLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  Suspend
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        )}
 
-        {/* Bulk Reinstate Dialog */}
-        {canManageUsers && (
-          <AlertDialog open={bulkReinstateDialog} onOpenChange={setBulkReinstateDialog}>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Reinstate {selectedModerators.size} Moderator(s)?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This will reinstate {selectedModerators.size} selected moderator account(s). They will be notified via email and will regain access to their accounts.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel disabled={bulkActionLoading}>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={handleBulkReinstate}
-                  className="gradient-driptyard-hover text-white"
-                  disabled={bulkActionLoading}
-                >
-                  {bulkActionLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  Reinstate
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        )}
+
       </div>
+      {/* Bulk Suspend Dialog */}
+      {canManageUsers && (
+        <AlertDialog open={bulkSuspendDialog} onOpenChange={setBulkSuspendDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Suspend {selectedModerators.size} Moderator(s)?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will suspend {selectedModerators.size} selected moderator account(s). They will be notified via email and will not be able to access their accounts until reinstated.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={bulkActionLoading}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleBulkSuspend}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                disabled={bulkActionLoading}
+              >
+                {bulkActionLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Suspend
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+
+      {/* Bulk Reinstate Dialog */}
+      {canManageUsers && (
+        <AlertDialog open={bulkReinstateDialog} onOpenChange={setBulkReinstateDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Reinstate {selectedModerators.size} Moderator(s)?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will reinstate {selectedModerators.size} selected moderator account(s). They will be notified via email and will regain access to their accounts.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={bulkActionLoading}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleBulkReinstate}
+                className="gradient-driptyard-hover text-white"
+                disabled={bulkActionLoading}
+              >
+                {bulkActionLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Reinstate
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </AdminLayout>
   );
 }
