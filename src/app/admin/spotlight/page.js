@@ -41,7 +41,7 @@ const STATUS_OPTIONS = [
   { value: "all", label: "All Status" },
   { value: "active", label: "Active" },
   { value: "removed", label: "Removed" },
-  { value: "expired", label: "Expired" },   
+  { value: "expired", label: "Expired" },
   { value: "paused", label: "Paused" },
 ];
 
@@ -131,7 +131,7 @@ function Spotlight() {
     const action = item.action?.toLowerCase() || "";
     const status = item.status?.toLowerCase() || "";
     const statusValue = action || status;
-    
+
     if (statusValue === "active") {
       return <Badge variant="success" className="text-xs">Active</Badge>;
     }
@@ -389,7 +389,7 @@ function Spotlight() {
                       baseUrl = `${baseUrl}/products`;
                     }
                     const productUrl = productId ? `${baseUrl}/${productId}` : null;
-                    
+
                     const handleRowClick = () => {
                       if (productUrl) {
                         window.open(productUrl, "_blank");
@@ -399,8 +399,8 @@ function Spotlight() {
                     // Render parent row
                     return (
                       <>
-                        <TableRow 
-                          key={spotlight.id} 
+                        <TableRow
+                          key={spotlight.id}
                           className={`hover:bg-muted/30 transition-colors ${productUrl ? "cursor-pointer" : ""}`}
                           onDoubleClick={productUrl ? handleRowClick : undefined}
                         >
@@ -448,7 +448,7 @@ function Spotlight() {
                             </div>
                           </TableCell>
                           <TableCell className="py-3 px-4">
-                            <p className="text-sm text-foreground">@{spotlight.applied_by_username || "—"}</p>
+                            <p className="text-sm text-foreground">@{spotlight.products[0]?.seller_username || "—"}</p>
                           </TableCell>
                           <TableCell className="py-3 px-4">
                             <p className="text-sm text-foreground">{formatDate(spotlight.start_time)}</p>
@@ -526,10 +526,10 @@ function Spotlight() {
                         {isExpanded && hasChildren && spotlight.products.map((childItem) => {
                           const childProductId = childItem.product_id;
                           const childProductUrl = childProductId ? `${baseUrl}/${childProductId}` : null;
-                          
+
                           return (
-                            <TableRow 
-                              key={childItem.id} 
+                            <TableRow
+                              key={childItem.id}
                               className="bg-muted/20 hover:bg-muted/30 transition-colors"
                             >
                               <TableCell className="py-3 px-4">
