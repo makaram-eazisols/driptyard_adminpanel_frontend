@@ -86,7 +86,7 @@ function Products() {
   // Check spotlight permissions
   const canSpotlight = user?.is_admin || user?.permissions?.can_spotlight === true;
   const canRemoveSpotlight = user?.is_admin || user?.permissions?.can_remove_spotlight === true;
-  
+
   // Check manage listings permission
   const canManageListings = user?.is_admin || user?.permissions?.can_manage_listings === true;
 
@@ -117,20 +117,20 @@ function Products() {
 
       const data = await apiClient.getAdminProducts(params);
       let items = data.products || [];
-      
+
       // Apply client-side filtering if needed
       if (status === "active") {
         items = items.filter((product) => product.is_active);
       } else if (status === "inactive") {
         items = items.filter((product) => !product.is_active);
       }
-      
+
       if (verification === "verified") {
         items = items.filter((product) => product.is_verified);
       } else if (verification === "unverified") {
         items = items.filter((product) => !product.is_verified);
       }
-      
+
       setProducts(items);
       setTotalPages(data.total_pages || 1);
       setTotalCount(data.total || items.length || 0);
@@ -242,7 +242,7 @@ function Products() {
     try {
       const product = products.find(p => p.id === productId);
       if (!product) return;
-      
+
       await apiClient.updateAdminProduct(productId, {
         title: product.title,
         price: Number(product.price) || 0,
@@ -565,34 +565,34 @@ function Products() {
     }
   };
 
-const getPrimaryImage = (product) => {
-  if (Array.isArray(product.images) && product.images.length > 0) {
-    return product.images[0];
-  }
-  if (Array.isArray(product.product_images) && product.product_images.length > 0) {
-    return product.product_images[0];
-  }
-  if (Array.isArray(product.media) && product.media.length > 0) {
-    const mediaItem = product.media[0];
-    return typeof mediaItem === "string" ? mediaItem : mediaItem?.url;
-  }
-  if (typeof product.image === "string") {
-    return product.image;
-  }
-  return null;
-};
+  const getPrimaryImage = (product) => {
+    if (Array.isArray(product.images) && product.images.length > 0) {
+      return product.images[0];
+    }
+    if (Array.isArray(product.product_images) && product.product_images.length > 0) {
+      return product.product_images[0];
+    }
+    if (Array.isArray(product.media) && product.media.length > 0) {
+      const mediaItem = product.media[0];
+      return typeof mediaItem === "string" ? mediaItem : mediaItem?.url;
+    }
+    if (typeof product.image === "string") {
+      return product.image;
+    }
+    return null;
+  };
 
-const getSellerName = (product) => {
-  if (product.seller_name) return product.seller_name;
-  if (product.owner?.name) return product.owner.name;
-  if (product.owner?.username) return product.owner.username;
-  if (product.owner?.email) return product.owner.email;
-  if (product.owner_name) return product.owner_name;
-  if (product.owner_email) return product.owner_email;
-  if (product.owner_username) return product.owner_username;
-  if (product.owner_id) return `User #${product.owner_id}`;
-  return "Unknown seller";
-};
+  const getSellerName = (product) => {
+    if (product.seller_name) return product.seller_name;
+    if (product.owner?.name) return product.owner.name;
+    if (product.owner?.username) return product.owner.username;
+    if (product.owner?.email) return product.owner.email;
+    if (product.owner_name) return product.owner_name;
+    if (product.owner_email) return product.owner_email;
+    if (product.owner_username) return product.owner_username;
+    if (product.owner_id) return `User #${product.owner_id}`;
+    return "Unknown seller";
+  };
 
   const getAuthBadge = (product) => {
     if (product.is_verified) {
@@ -601,11 +601,11 @@ const getSellerName = (product) => {
     return { label: "Unverified", variant: "destructive" };
   };
 
-const formatPrice = (value) => {
-  const numeric = Number(value);
-  if (Number.isNaN(numeric)) return "—";
-  return `$${numeric.toFixed(2)}`;
-};
+  const formatPrice = (value) => {
+    const numeric = Number(value);
+    if (Number.isNaN(numeric)) return "—";
+    return `$${numeric.toFixed(2)}`;
+  };
 
   return (
     <AdminLayout>
@@ -712,234 +712,247 @@ const formatPrice = (value) => {
           </div>
         )}
         {/* <div className="rounded-2xl border border-border bg-background shadow-sm"> */}
-          <div >
-            {loading ? (
-              <div className="space-y-4">
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <Skeleton key={i} className="h-16 w-full" />
-                ))}
-              </div>
-            ) : products.length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground">No products found</p>
-              </div>
-            ) : (
-              <>
-                {/* Bulk Action Toolbar */}
-                {(canManageListings || canSpotlight) && selectedProducts.size > 0 && (
-                  <div className="flex items-center justify-between rounded-lg border border-border bg-muted/50 p-4">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-primary">
-                        {selectedProducts.size} product(s) selected
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {canManageListings && (
-                        <>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setBulkStatusDialog(true)}
-                            disabled={bulkActionLoading}
-                          >
-                            Change Status
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setBulkVerificationDialog(true)}
-                            disabled={bulkActionLoading}
-                          >
-                            Change Verification
-                          </Button>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => setBulkDeleteDialog(true)}
-                            disabled={bulkActionLoading}
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete
-                          </Button>
-                        </>
-                      )}
-                      {canSpotlight && (
-                        <>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setBulkSpotlightDialog(true)}
-                            disabled={bulkActionLoading || areAllSelectedSpotlighted()}
-                            className="border-[#E0B74F] text-[#E0B74F] hover:bg-[#E0B74F] hover:text-white"
-                          >
-                            <Star className="h-4 w-4 mr-2" />
-                            Add Spotlight
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setBulkEditSpotlightDialog(true)}
-                            disabled={bulkActionLoading || areAnySelectedNotSpotlighted()}
-                            className="border-[#E0B74F] text-[#E0B74F] hover:bg-[#E0B74F] hover:text-white"
-                          >
-                            <Edit2 className="h-4 w-4 mr-2" />
-                            Edit Spotlight
-                          </Button>
-                        </>
-                      )}
-                      {canRemoveSpotlight && (
+        <div >
+          {loading ? (
+            <div className="space-y-4">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <Skeleton key={i} className="h-16 w-full" />
+              ))}
+            </div>
+          ) : products.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">No products found</p>
+            </div>
+          ) : (
+            <>
+              {/* Bulk Action Toolbar */}
+              {(canManageListings || canSpotlight) && selectedProducts.size > 0 && (
+                <div className="flex items-center justify-between rounded-lg border border-border bg-muted/50 p-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-primary">
+                      {selectedProducts.size} product(s) selected
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {canManageListings && (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setBulkStatusDialog(true)}
+                          disabled={bulkActionLoading}
+                        >
+                          Change Status
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setBulkVerificationDialog(true)}
+                          disabled={bulkActionLoading}
+                        >
+                          Change Verification
+                        </Button>
                         <Button
                           variant="destructive"
                           size="sm"
-                          onClick={() => setBulkRemoveSpotlightDialog(true)}
-                          disabled={bulkActionLoading || areAnySelectedNotSpotlighted()}
+                          onClick={() => setBulkDeleteDialog(true)}
+                          disabled={bulkActionLoading}
                         >
                           <Trash2 className="h-4 w-4 mr-2" />
-                          Remove Spotlight
+                          Delete
                         </Button>
-                      )}
+                      </>
+                    )}
+                    {canSpotlight && (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setBulkSpotlightDialog(true)}
+                          disabled={bulkActionLoading || areAllSelectedSpotlighted()}
+                          className="border-[#E0B74F] text-[#E0B74F] hover:bg-[#E0B74F] hover:text-white"
+                        >
+                          <Star className="h-4 w-4 mr-2" />
+                          Add Spotlight
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setBulkEditSpotlightDialog(true)}
+                          disabled={bulkActionLoading || areAnySelectedNotSpotlighted()}
+                          className="border-[#E0B74F] text-[#E0B74F] hover:bg-[#E0B74F] hover:text-white"
+                        >
+                          <Edit2 className="h-4 w-4 mr-2" />
+                          Edit Spotlight
+                        </Button>
+                      </>
+                    )}
+                    {canRemoveSpotlight && (
                       <Button
-                        variant="ghost"
+                        variant="destructive"
                         size="sm"
-                        onClick={() => setSelectedProducts(new Set())}
-                        disabled={bulkActionLoading}
+                        onClick={() => setBulkRemoveSpotlightDialog(true)}
+                        disabled={bulkActionLoading || areAnySelectedNotSpotlighted()}
                       >
-                        <X className="h-4 w-4 mr-2" />
-                        Clear Selection
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Remove Spotlight
                       </Button>
-                    </div>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedProducts(new Set())}
+                      disabled={bulkActionLoading}
+                    >
+                      <X className="h-4 w-4 mr-2" />
+                      Clear Selection
+                    </Button>
                   </div>
-                )}
+                </div>
+              )}
 
-                <div className="rounded-lg border border-border overflow-hidden">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-muted/50 hover:bg-muted/50">
-                        {(canManageListings || canSpotlight) && (
-                          <TableHead className="h-12 px-4 w-12">
-                            <Checkbox
-                              checked={isAllSelected}
-                              onCheckedChange={handleSelectAll}
-                            />
-                          </TableHead>
-                        )}
-                        <TableHead className="h-12 px-4 font-semibold text-secondary max-w-[100px]">Thumbnail</TableHead>
-                        <TableHead className="h-12 px-4 font-semibold text-secondary max-w-[250px]">Title</TableHead>
-                        <TableHead className="h-12 px-4 font-semibold text-secondary max-w-[150px]">Seller</TableHead>
-                        <TableHead className="h-12 px-4 font-semibold text-secondary max-w-[100px]">Price</TableHead>
-                        <TableHead className="h-12 px-4 font-semibold text-secondary max-w-[120px]">Status</TableHead>
-                        <TableHead className="h-12 px-4 font-semibold text-secondary max-w-[120px]">Verification</TableHead>
-                        {(canManageListings || canSpotlight) && (
-                          <TableHead className="h-12 px-4 text-right font-semibold text-secondary max-w-[100px]">Actions</TableHead>
-                        )}
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {getSortedProducts(products).map((product) => {
-                        const image = getPrimaryImage(product);
-                        const authBadge = getAuthBadge(product);
-                        const productId = product.id;
-                        const websiteUrl = process.env.NEXT_PUBLIC_WEBSITE_URL || "https://driptyard.vercel.app";
-                        // Ensure proper URL construction with /products/ path
-                        let baseUrl = websiteUrl.endsWith('/') ? websiteUrl.slice(0, -1) : websiteUrl;
-                        if (!baseUrl.endsWith('/products')) {
-                          baseUrl = `${baseUrl}/products`;
+              <div className="rounded-lg border border-border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50 hover:bg-muted/50">
+                      {(canManageListings || canSpotlight) && (
+                        <TableHead className="h-12 px-4 w-12">
+                          <Checkbox
+                            checked={isAllSelected}
+                            onCheckedChange={handleSelectAll}
+                          />
+                        </TableHead>
+                      )}
+                      <TableHead className="h-12 px-4 font-semibold text-secondary max-w-[100px]">Thumbnail</TableHead>
+                      <TableHead className="h-12 px-4 font-semibold text-secondary max-w-[250px]">Title</TableHead>
+                      <TableHead className="h-12 px-4 font-semibold text-secondary max-w-[150px]">Seller</TableHead>
+                      <TableHead className="h-12 px-4 font-semibold text-secondary max-w-[100px]">Price</TableHead>
+                      <TableHead className="h-12 px-4 font-semibold text-secondary max-w-[120px]">Status</TableHead>
+                      <TableHead className="h-12 px-4 font-semibold text-secondary max-w-[120px]">Verification</TableHead>
+                      {(canManageListings || canSpotlight) && (
+                        <TableHead className="h-12 px-4 text-right font-semibold text-secondary max-w-[100px]">Actions</TableHead>
+                      )}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {getSortedProducts(products).map((product) => {
+                      const image = getPrimaryImage(product);
+                      const authBadge = getAuthBadge(product);
+                      const productId = product.id;
+                      const websiteUrl = process.env.NEXT_PUBLIC_WEBSITE_URL || "https://driptyard.vercel.app";
+                      // Ensure proper URL construction with /products/ path
+                      let baseUrl = websiteUrl.endsWith('/') ? websiteUrl.slice(0, -1) : websiteUrl;
+                      if (!baseUrl.endsWith('/products')) {
+                        baseUrl = `${baseUrl}/products`;
+                      }
+                      const productUrl = productId ? `${baseUrl}/${productId}` : null;
+
+                      const handleRowClick = () => {
+                        if (productUrl) {
+                          window.open(productUrl, "_blank");
                         }
-                        const productUrl = productId ? `${baseUrl}/${productId}` : null;
-                        
-                        const handleRowClick = () => {
-                          if (productUrl) {
-                            window.open(productUrl, "_blank");
-                          }
-                        };
+                      };
 
-                        return (
-                          <TableRow 
-                            key={product.id} 
-                            className={`hover:bg-muted/30 transition-colors ${productUrl ? "cursor-pointer" : ""}`}
-                            onDoubleClick={productUrl ? handleRowClick : undefined}
-                          >
-                            {(canManageListings || canSpotlight) && (
-                              <TableCell className="py-3 px-4">
-                                <Checkbox
-                                  checked={selectedProducts.has(product.id)}
-                                  onCheckedChange={(checked) => handleSelectProduct(product.id, checked)}
+                      return (
+                        <TableRow
+                          key={product.id}
+                          className={`hover:bg-muted/30 transition-colors ${productUrl ? "cursor-pointer" : ""}`}
+                          onDoubleClick={productUrl ? handleRowClick : undefined}
+                        >
+                          {(canManageListings || canSpotlight) && (
+                            <TableCell className="py-3 px-4">
+                              <Checkbox
+                                checked={selectedProducts.has(product.id)}
+                                onCheckedChange={(checked) => handleSelectProduct(product.id, checked)}
+                              />
+                            </TableCell>
+                          )}
+                          <TableCell className="py-3 px-4 max-w-[100px]">
+                            <div className="h-16 w-16 rounded-lg border border-border overflow-hidden bg-muted/50 shadow-sm">
+                              {image ? (
+                                <img
+                                  src={image}
+                                  alt={product.title}
+                                  className="h-full w-full object-cover"
                                 />
-                              </TableCell>
-                            )}
-                            <TableCell className="py-3 px-4 max-w-[100px]">
-                              <div className="h-16 w-16 rounded-lg border border-border overflow-hidden bg-muted/50 shadow-sm">
-                                {image ? (
-                                  <img
-                                    src={image}
-                                    alt={product.title}
-                                    className="h-full w-full object-cover"
-                                  />
-                                ) : (
-                                  <div className="flex h-full w-full items-center justify-center text-[10px] font-medium text-muted-foreground">
-                                    No Image
-                                  </div>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell className="py-3 px-4 max-w-[250px]">
-                              <a href={productUrl} target="_blank" className="font-semibold text-sm text-primary leading-tight break-words">{product.title || "Untitled listing"}</a>
-                            </TableCell>
-                            <TableCell className="py-3 px-4 max-w-[150px]">
-                              <p className="text-sm text-foreground truncate">{product?.owner_name}</p>
-                            </TableCell>
-                            <TableCell className="py-3 px-4 max-w-[100px]">
-                              <p className="font-semibold text-sm text-primary">{formatPrice(product.price)}</p>
-                            </TableCell>
-                            <TableCell className="py-3 px-4 max-w-[120px]">
-                              <Badge variant={getStatusBadgeVariant(product)} className="text-xs">{getStatusText(product)}</Badge>
-                            </TableCell>
-                            <TableCell className="py-3 px-4 max-w-[120px]">
-                              <Badge variant={authBadge.variant} className="text-xs">{authBadge.label}</Badge>
-                            </TableCell>
-                            {(canManageListings || canSpotlight) && (
-                              <TableCell className="py-3 px-4 text-right max-w-[100px]">
-                                {(canManageListings || (product.is_verified && canSpotlight)) && (
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                                        <MoreVertical className="h-4 w-4" />
-                                      </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
+                              ) : (
+                                <div className="flex h-full w-full items-center justify-center text-[10px] font-medium text-muted-foreground">
+                                  No Image
+                                </div>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-3 px-4 max-w-[250px]">
+                            <a href={productUrl} target="_blank" className="font-semibold text-sm text-primary leading-tight break-words">{product.title || "Untitled listing"}</a>
+                          </TableCell>
+                          <TableCell className="py-3 px-4 max-w-[150px]">
+                            <p className="text-sm text-foreground truncate">{product?.owner_name}</p>
+                          </TableCell>
+                          <TableCell className="py-3 px-4 max-w-[100px]">
+                            <p className="font-semibold text-sm text-primary">{formatPrice(product.price)}</p>
+                          </TableCell>
+                          <TableCell className="py-3 px-4 max-w-[120px]">
+                            <Badge variant={getStatusBadgeVariant(product)} className="text-[10px] px-2 py-0.5 font-medium">{getStatusText(product)}</Badge>
+                          </TableCell>
+                          <TableCell className="py-3 px-4 max-w-[120px]">
+                            <div className="flex items-center gap-1.5">
+                              <Badge variant={authBadge.variant} className="text-[10px] px-2 py-1 font-medium whitespace-nowrap">
+                                {authBadge.label}
+                              </Badge>
+                              {product.is_spotlighted && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] px-1.5 py-1 border-[#E0B74F]/30 text-[#E0B74F] bg-[#E0B74F]/5 flex items-center justify-center font-semibold min-w-[28px]"
+                                  title="Spotlighted"
+                                >
+                                  <Star className="h-3 w-3 fill-[#E0B74F]" />
+                                </Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          {(canManageListings || canSpotlight) && (
+                            <TableCell className="py-3 px-4 text-right max-w-[100px]">
+                              {(canManageListings || (product.is_verified && canSpotlight)) && (
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                                      <MoreVertical className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem
+                                      className="cursor-pointer"
+                                      onClick={() => {
+                                        const websiteUrl = process.env.NEXT_PUBLIC_WEBSITE_URL || "https://driptyard.vercel.app";
+                                        let baseUrl = websiteUrl.endsWith('/') ? websiteUrl.slice(0, -1) : websiteUrl;
+                                        if (!baseUrl.endsWith('/products')) {
+                                          baseUrl = `${baseUrl}/products`;
+                                        }
+                                        const productUrl = product.id ? `${baseUrl}/${product.id}` : null;
+                                        if (productUrl) {
+                                          window.open(productUrl, "_blank");
+                                        }
+                                      }}
+                                    >
+                                      <Eye className="h-4 w-4 mr-2" />
+                                      View
+                                    </DropdownMenuItem>
+                                    {product.is_verified && product.is_active && !product.is_spotlighted && canSpotlight && (
                                       <DropdownMenuItem
-                                        className="cursor-pointer"
-                                        onClick={() => {
-                                          const websiteUrl = process.env.NEXT_PUBLIC_WEBSITE_URL || "https://driptyard.vercel.app";
-                                          let baseUrl = websiteUrl.endsWith('/') ? websiteUrl.slice(0, -1) : websiteUrl;
-                                          if (!baseUrl.endsWith('/products')) {
-                                            baseUrl = `${baseUrl}/products`;
-                                          }
-                                          const productUrl = product.id ? `${baseUrl}/${product.id}` : null;
-                                          if (productUrl) {
-                                            window.open(productUrl, "_blank");
-                                          }
-                                        }}
+                                        className="cursor-pointer group flex items-center gap-2 hover:bg-[#E0B74F] hover:text-[#0B0B0D] focus:bg-[#E0B74F] focus:text-[#0B0B0D] transition-colors"
+                                        onClick={() => setSpotlightProduct(product)}
                                       >
-                                        <Eye className="h-4 w-4 mr-2" />
-                                        View
+                                        <Star className="h-4 w-4 text-accent transition-colors group-hover:text-[#0B0B0D] group-focus:text-[#0B0B0D]" />
+                                        Spotlight
                                       </DropdownMenuItem>
-                                      {product.is_verified && product.is_active && !product.is_spotlighted && canSpotlight && (
-                                        <DropdownMenuItem
-                                          className="cursor-pointer group flex items-center gap-2 hover:bg-[#E0B74F] hover:text-[#0B0B0D] focus:bg-[#E0B74F] focus:text-[#0B0B0D] transition-colors"
-                                          onClick={() => setSpotlightProduct(product)}
-                                        >
-                                          <Star className="h-4 w-4 text-accent transition-colors group-hover:text-[#0B0B0D] group-focus:text-[#0B0B0D]" />
-                                          Spotlight
+                                    )}
+                                    {canManageListings && (
+                                      <>
+                                        <DropdownMenuItem className="cursor-pointer" onClick={() => setEditProduct(product)}>
+                                          <Edit2 className="h-4 w-4 mr-2" />
+                                          Edit
                                         </DropdownMenuItem>
-                                      )}
-                                      {canManageListings && (
-                                        <>
-                                          <DropdownMenuItem className="cursor-pointer" onClick={() => setEditProduct(product)}>
-                                            <Edit2 className="h-4 w-4 mr-2" />
-                                            Edit
-                                          </DropdownMenuItem>
-                                          {/* {product.is_active && (
+                                        {/* {product.is_active && (
                                             <DropdownMenuItem
                                               className="text-destructive cursor-pointer focus:text-destructive"
                                               onClick={() => handleQuickDisable(product.id)}
@@ -948,149 +961,149 @@ const formatPrice = (value) => {
                                               Make Disable
                                             </DropdownMenuItem>
                                           )} */}
-                                          <DropdownMenuItem
-                                            className="text-destructive cursor-pointer focus:text-destructive"
-                                            onClick={() => setDeleteProductId(product.id)}
-                                          >
-                                            <Trash2 className="h-4 w-4 mr-2" />
-                                            Delete
-                                          </DropdownMenuItem>
-                                        </>
-                                      )}
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
-                                )}
-                              </TableCell>
-                            )}
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
-                {totalPages > 1 && (
-                  <div className="flex justify-end mt-8">
-                    <div className="inline-flex items-center divide-x divide-border rounded-xl border border-border bg-background shadow-sm">
-                      <div className="px-4 py-2 text-sm font-medium">
-                        <span className="text-primary">
-                          {totalCount === 0
-                            ? "0"
-                            : `${(page - 1) * pageSize + 1}-${Math.min(page * pageSize, totalCount)}`}
-                        </span>
-                        <span className="ml-1 text-muted-foreground">of {totalCount}</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setPage((p) => Math.max(1, p - 1))}
-                        disabled={page === 1}
-                        className="h-10 w-10 flex items-center justify-center text-muted-foreground hover:text-primary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                      >
-                        <ChevronLeft className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                        disabled={page === totalPages}
-                        className="h-10 w-10 flex items-center justify-center text-muted-foreground hover:text-primary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                      >
-                        <ChevronRight className="h-4 w-4" />
-                      </button>
+                                        <DropdownMenuItem
+                                          className="text-destructive cursor-pointer focus:text-destructive"
+                                          onClick={() => setDeleteProductId(product.id)}
+                                        >
+                                          <Trash2 className="h-4 w-4 mr-2" />
+                                          Delete
+                                        </DropdownMenuItem>
+                                      </>
+                                    )}
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              )}
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+              {totalPages > 1 && (
+                <div className="flex justify-end mt-8">
+                  <div className="inline-flex items-center divide-x divide-border rounded-xl border border-border bg-background shadow-sm">
+                    <div className="px-4 py-2 text-sm font-medium">
+                      <span className="text-primary">
+                        {totalCount === 0
+                          ? "0"
+                          : `${(page - 1) * pageSize + 1}-${Math.min(page * pageSize, totalCount)}`}
+                      </span>
+                      <span className="ml-1 text-muted-foreground">of {totalCount}</span>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      disabled={page === 1}
+                      className="h-10 w-10 flex items-center justify-center text-muted-foreground hover:text-primary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={page === totalPages}
+                      className="h-10 w-10 flex items-center justify-center text-muted-foreground hover:text-primary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
                   </div>
-                )}
-              </>
-            )}
-          </div>
+                </div>
+              )}
+            </>
+          )}
         </div>
+      </div>
       {/* </div> */}
 
       {/* Delete Confirmation Dialog */}
       {canManageListings && (
         <AlertDialog open={!!deleteProductId} onOpenChange={() => setDeleteProductId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the product.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete the product.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       )}
 
       {/* Edit Product Dialog */}
       {canManageListings && (
         <Dialog open={!!editProduct} onOpenChange={() => setEditProduct(null)}>
-        <DialogContent className="max-w-md" onOpenAutoFocus={(e) => e.preventDefault()}>
-          <DialogHeader>
-            <DialogTitle>Edit Product Status</DialogTitle>
-          </DialogHeader>
-          {editProduct && (
-            <div className="space-y-4 py-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="grid gap-2">
-                  <Label htmlFor="product-name">Product Name</Label>
-                  <Input
-                    id="product-name"
-                    value={editProduct.title || ""}
-                    onChange={(e) => setEditProduct({ ...editProduct, title: e.target.value })}
+          <DialogContent className="max-w-md" onOpenAutoFocus={(e) => e.preventDefault()}>
+            <DialogHeader>
+              <DialogTitle>Edit Product Status</DialogTitle>
+            </DialogHeader>
+            {editProduct && (
+              <div className="space-y-4 py-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="grid gap-2">
+                    <Label htmlFor="product-name">Product Name</Label>
+                    <Input
+                      id="product-name"
+                      value={editProduct.title || ""}
+                      onChange={(e) => setEditProduct({ ...editProduct, title: e.target.value })}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="product-price">Price</Label>
+                    <Input
+                      id="product-price"
+                      type="number"
+                      step="0.01"
+                      value={editProduct.price ?? ""}
+                      onChange={(e) => setEditProduct({ ...editProduct, price: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="grid gap-2">
+                    <Label htmlFor="product-condition">Condition</Label>
+                    <Select
+                      value={editProduct.condition || ""}
+                      onValueChange={(value) => setEditProduct({ ...editProduct, condition: value })}
+                    >
+                      <SelectTrigger id="product-condition">
+                        <SelectValue placeholder="Select condition" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CONDITIONS.map((condition) => (
+                          <SelectItem key={condition.value} value={condition.value}>
+                            {condition.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="is-active">Active</Label>
+                  <Switch
+                    id="is-active"
+                    checked={editProduct.is_active}
+                    onCheckedChange={(checked) => setEditProduct({ ...editProduct, is_active: checked })}
                   />
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="product-price">Price</Label>
-                  <Input
-                    id="product-price"
-                    type="number"
-                    step="0.01"
-                    value={editProduct.price ?? ""}
-                    onChange={(e) => setEditProduct({ ...editProduct, price: e.target.value })}
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="is-verified">Verified</Label>
+                  <Switch
+                    id="is-verified"
+                    checked={editProduct.is_verified}
+                    onCheckedChange={(checked) => setEditProduct({ ...editProduct, is_verified: checked })}
+                  // disabled={editProduct.is_verified}
                   />
                 </div>
-              </div>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="grid gap-2">
-                  <Label htmlFor="product-condition">Condition</Label>
-                  <Select
-                    value={editProduct.condition || ""}
-                    onValueChange={(value) => setEditProduct({ ...editProduct, condition: value })}
-                  >
-                    <SelectTrigger id="product-condition">
-                      <SelectValue placeholder="Select condition" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {CONDITIONS.map((condition) => (
-                        <SelectItem key={condition.value} value={condition.value}>
-                          {condition.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <Label htmlFor="is-active">Active</Label>
-                <Switch
-                  id="is-active"
-                  checked={editProduct.is_active}
-                  onCheckedChange={(checked) => setEditProduct({ ...editProduct, is_active: checked })}
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <Label htmlFor="is-verified">Verified</Label>
-                <Switch
-                  id="is-verified"
-                  checked={editProduct.is_verified}
-                  onCheckedChange={(checked) => setEditProduct({ ...editProduct, is_verified: checked })}
-                  disabled={editProduct.is_verified}
-                />
-              </div>
-              {/* <div className="flex items-center justify-between">
+                {/* <div className="flex items-center justify-between">
                 <Label htmlFor="is-flagged">Flagged</Label>
                 <Switch
                   id="is-flagged"
@@ -1098,7 +1111,7 @@ const formatPrice = (value) => {
                   onCheckedChange={(checked) => setEditProduct({ ...editProduct, is_flagged: checked })}
                 />
               </div> */}
-              {/* <div className="flex items-center justify-between">
+                {/* <div className="flex items-center justify-between">
                 <Label htmlFor="is-featured">Featured</Label>
                 <Switch
                   id="is-featured"
@@ -1106,39 +1119,39 @@ const formatPrice = (value) => {
                   onCheckedChange={(checked) => setEditProduct({ ...editProduct, is_spotlighted: checked })}
                 />
               </div> */}
-              <div className="flex justify-between items-center pt-4">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    const websiteUrl = process.env.NEXT_PUBLIC_WEBSITE_URL || "https://driptyard.vercel.app";
-                    let baseUrl = websiteUrl.endsWith('/') ? websiteUrl.slice(0, -1) : websiteUrl;
-                    if (!baseUrl.endsWith('/products')) {
-                      baseUrl = `${baseUrl}/products`;
-                    }
-                    const productUrl = editProduct.id ? `${baseUrl}/${editProduct.id}` : null;
-                    if (productUrl) {
-                      window.open(productUrl, "_blank");
-                    }
-                  }}
-                  className="flex items-center gap-2"
-                >
-                  <ExternalLink className="h-4 w-4" />
-                  View Listing
-                </Button>
-                <div className="flex gap-2">
-                  <Button variant="outline" onClick={() => setEditProduct(null)}>
-                    Cancel
+                <div className="flex justify-between items-center pt-4">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      const websiteUrl = process.env.NEXT_PUBLIC_WEBSITE_URL || "https://driptyard.vercel.app";
+                      let baseUrl = websiteUrl.endsWith('/') ? websiteUrl.slice(0, -1) : websiteUrl;
+                      if (!baseUrl.endsWith('/products')) {
+                        baseUrl = `${baseUrl}/products`;
+                      }
+                      const productUrl = editProduct.id ? `${baseUrl}/${editProduct.id}` : null;
+                      if (productUrl) {
+                        window.open(productUrl, "_blank");
+                      }
+                    }}
+                    className="flex items-center gap-2"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    View Listing
                   </Button>
-                  <Button onClick={handleUpdate} disabled={editLoading}>
-                    {editLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                    Save Changes
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => setEditProduct(null)}>
+                      Cancel
+                    </Button>
+                    <Button onClick={handleUpdate} disabled={editLoading}>
+                      {editLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                      Save Changes
+                    </Button>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+            )}
+          </DialogContent>
+        </Dialog>
       )}
 
       {/* Spotlight Modal */}
@@ -1444,7 +1457,7 @@ const formatPrice = (value) => {
             </div>
           )}
         </DialogContent>
-          </Dialog>
+      </Dialog>
 
       {/* Bulk Delete Dialog */}
       {canManageListings && (
