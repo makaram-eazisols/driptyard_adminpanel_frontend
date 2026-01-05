@@ -52,6 +52,7 @@ function Products() {
   const [searchQuery, setSearchQuery] = useState("");
   const [status, setStatus] = useState("all");
   const [verification, setVerification] = useState("all");
+  const [spotlighted, setSpotlighted] = useState("all");
   const [sortOrder, setSortOrder] = useState("none");
   const [showFilters, setShowFilters] = useState(false);
   const [page, setPage] = useState(1);
@@ -115,6 +116,14 @@ function Products() {
         }
       }
 
+      if (spotlighted && spotlighted !== "all") {
+        if (spotlighted === "spotlighted") {
+          params.is_spotlighted = true;
+        } else if (spotlighted === "not-spotlighted") {
+          params.is_spotlighted = false;
+        }
+      }
+
       const data = await apiClient.getAdminProducts(params);
       let items = data.products || [];
 
@@ -129,6 +138,12 @@ function Products() {
         items = items.filter((product) => product.is_verified);
       } else if (verification === "unverified") {
         items = items.filter((product) => !product.is_verified);
+      }
+
+      if (spotlighted === "spotlighted") {
+        items = items.filter((product) => product.is_spotlighted);
+      } else if (spotlighted === "not-spotlighted") {
+        items = items.filter((product) => !product.is_spotlighted);
       }
 
       setProducts(items);
@@ -146,6 +161,7 @@ function Products() {
     setSearchQuery("");
     setStatus("all");
     setVerification("all");
+    setSpotlighted("all");
     setSortOrder("none");
     setPage(1);
   };
@@ -162,13 +178,19 @@ function Products() {
     { value: "unverified", label: "Unverified" },
   ];
 
+  const SPOTLIGHTED_OPTIONS = [
+    { value: "all", label: "All Spotlight" },
+    { value: "spotlighted", label: "Spotlighted" },
+    { value: "not-spotlighted", label: "Not Spotlighted" },
+  ];
+
   const SORT_OPTIONS = [
     { value: "none", label: "No Sort" },
     { value: "low-to-high", label: "Price: Low to High" },
     { value: "high-to-low", label: "Price: High to Low" },
   ];
 
-  const hasActiveFilters = searchQuery || (status && status !== "all") || (verification && verification !== "all") || (sortOrder && sortOrder !== "none");
+  const hasActiveFilters = searchQuery || (status && status !== "all") || (verification && verification !== "all") || (spotlighted && spotlighted !== "all") || (sortOrder && sortOrder !== "none");
 
   // Sort products by price
   const getSortedProducts = (productsList) => {
@@ -193,7 +215,7 @@ function Products() {
 
   useEffect(() => {
     fetchProducts();
-  }, [page, searchQuery, status, verification]);
+  }, [page, searchQuery, status, verification, spotlighted]);
 
   useEffect(() => {
     if (spotlightProduct) {
@@ -346,7 +368,7 @@ function Products() {
     fetchProducts();
     // Clear selection when filters change
     setSelectedProducts(new Set());
-  }, [page, searchQuery, status, verification]);
+  }, [page, searchQuery, status, verification, spotlighted]);
 
   // Bulk selection handlers
   const handleSelectAll = (checked) => {
@@ -625,7 +647,7 @@ function Products() {
               Filters
               {hasActiveFilters && (
                 <Badge variant="secondary" className="ml-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs">
-                  {[searchQuery, status && status !== "all" ? status : null, verification && verification !== "all" ? verification : null, sortOrder && sortOrder !== "none" ? sortOrder : null].filter(Boolean).length}
+                  {[searchQuery, status && status !== "all" ? status : null, verification && verification !== "all" ? verification : null, spotlighted && spotlighted !== "all" ? spotlighted : null, sortOrder && sortOrder !== "none" ? sortOrder : null].filter(Boolean).length}
                 </Badge>
               )}
             </Button>
@@ -683,6 +705,24 @@ function Products() {
                   </SelectTrigger>
                   <SelectContent>
                     {VERIFICATION_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2 w-full md:w-auto md:min-w-[200px]">
+                <Label htmlFor="spotlighted">Spotlight</Label>
+                <Select value={spotlighted} onValueChange={(value) => {
+                  setSpotlighted(value);
+                  setPage(1);
+                }}>
+                  <SelectTrigger id="spotlighted">
+                    <SelectValue placeholder="Select spotlight status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SPOTLIGHTED_OPTIONS.map((option) => (
                       <SelectItem key={option.value} value={option.value}>
                         {option.label}
                       </SelectItem>
