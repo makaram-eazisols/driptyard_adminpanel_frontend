@@ -30,6 +30,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { apiClient } from "@/lib/api-client";
 import { notifyError, notifySuccess } from "@/lib/toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -298,7 +299,7 @@ function FlaggedContent() {
     try {
       setLoadingActions((prev) => ({ ...prev, [actionKey]: true }));
       await apiClient.rejectReport(item.reportId);
-      notifySuccess("Report has been rejected");
+      notifySuccess("The report has been declined, listing remains active");
       fetchFlaggedContent();
     } catch (error) {
       notifyError(error.response?.data?.detail || error.message || "Failed to reject report");
@@ -536,26 +537,44 @@ function FlaggedContent() {
                 <div className="flex items-center gap-2">
                   {getSelectedItemsStatuses().every(s => s === "pending") && (
                     <>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setBulkApproveDialog(true)}
-                        disabled={bulkActionLoading}
-                        className="text-green-600 hover:text-green-700"
-                      >
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                        Approve
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setBulkRejectDialog(true)}
-                        disabled={bulkActionLoading}
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        <XCircle className="h-4 w-4 mr-2" />
-                        Reject
-                      </Button>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setBulkApproveDialog(true)}
+                              disabled={bulkActionLoading}
+                              className="text-green-600 hover:text-green-700"
+                            >
+                              <CheckCircle className="h-4 w-4 mr-2" />
+                              Approve
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Report has been approved and resolved</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setBulkRejectDialog(true)}
+                              disabled={bulkActionLoading}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <XCircle className="h-4 w-4 mr-2" />
+                              Decline
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>The report has been declined, listing remains active</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     </>
                   )}
                   <Button
@@ -708,30 +727,48 @@ function FlaggedContent() {
                                 </DropdownMenuItem>
                                 {item.status === "pending" ? (
                                   <>
-                                    <DropdownMenuItem
-                                      className="cursor-pointer"
-                                      onClick={() => handleApprove(item)}
-                                      disabled={loadingActions[`approve-${item.reportId}`]}
-                                    >
-                                      {loadingActions[`approve-${item.reportId}`] ? (
-                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                      ) : (
-                                        <CheckCircle className="h-4 w-4 mr-2" />
-                                      )}
-                                      Approve
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                      className="text-destructive cursor-pointer focus:text-destructive"
-                                      onClick={() => handleRemove(item)}
-                                      disabled={loadingActions[`remove-${item.reportId}`]}
-                                    >
-                                      {loadingActions[`remove-${item.reportId}`] ? (
-                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                      ) : (
-                                        <XCircle className="h-4 w-4 mr-2" />
-                                      )}
-                                      Remove
-                                    </DropdownMenuItem>
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <DropdownMenuItem
+                                            className="cursor-pointer"
+                                            onClick={() => handleApprove(item)}
+                                            disabled={loadingActions[`approve-${item.reportId}`]}
+                                          >
+                                            {loadingActions[`approve-${item.reportId}`] ? (
+                                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                            ) : (
+                                              <CheckCircle className="h-4 w-4 mr-2" />
+                                            )}
+                                            Approve
+                                          </DropdownMenuItem>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          <p>Report has been approved and resolved</p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <DropdownMenuItem
+                                            className="text-destructive cursor-pointer focus:text-destructive"
+                                            onClick={() => handleRemove(item)}
+                                            disabled={loadingActions[`remove-${item.reportId}`]}
+                                          >
+                                            {loadingActions[`remove-${item.reportId}`] ? (
+                                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                            ) : (
+                                              <XCircle className="h-4 w-4 mr-2" />
+                                            )}
+                                            Decline
+                                          </DropdownMenuItem>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          <p>The report has been declined, listing remains active</p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
                                   </>
                                 ) : null}
                               </DropdownMenuContent>
@@ -947,9 +984,9 @@ function FlaggedContent() {
           <AlertDialog open={bulkRejectDialog} onOpenChange={setBulkRejectDialog}>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Reject {selectedItems.size} Report(s)?</AlertDialogTitle>
+                <AlertDialogTitle>Decline {selectedItems.size} Report(s)?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This will reject {selectedItems.size} selected report(s). This action cannot be undone.
+                  This will decline {selectedItems.size} selected report(s). The listings will remain active. This action cannot be undone.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -960,7 +997,7 @@ function FlaggedContent() {
                   disabled={bulkActionLoading}
                 >
                   {bulkActionLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  Reject Reports
+                  Decline Reports
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>

@@ -45,8 +45,10 @@ function Users() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [status, setStatus] = useState("all");
-  const [joinDateSort, setJoinDateSort] = useState("none");
-  const [listingsSort, setListingsSort] = useState("none");
+  // Backend supports: 'all', 'most_recent', 'least_recent'
+  const [joinDateSort, setJoinDateSort] = useState("all");
+  // Backend supports: 'all', 'most_recent', 'least_recent'
+  const [listingsSort, setListingsSort] = useState("all");
   const [showFilters, setShowFilters] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -102,40 +104,29 @@ function Users() {
       setLoading(true);
       const params = {
         page: currentPage,
-        page_size: 10,
+        page_size: pageSize,
         search: searchTerm || undefined,
         exclude_admins: true,
       };
 
       if (status && status !== "all") {
-        if (status === "active") {
-          params.is_active = true;
-        } else if (status === "inactive") {
-          params.is_active = false;
-        } else if (status === "isSuspend") {
-          params.isSuspend = true;
-        }
+        params.status = status;
+      }
+
+      // Delegate sorting to backend
+      if (joinDateSort && joinDateSort !== "all") {
+        params.joining_date_sort = joinDateSort;
+      }
+      if (listingsSort && listingsSort !== "all") {
+        params.listings_sort = listingsSort;
       }
 
       const data = await apiClient.getAdminUsers(params);
-      // Filter out admins and moderators on client side
-      let customerUsers = (data.users || []).filter((user) => !user.is_admin && !user.is_moderator);
-
-      // Apply client-side status filtering if needed
-      if (status === "active") {
-        customerUsers = customerUsers.filter((user) => user.is_active && !user.is_banned && user.is_verified);
-      } else if (status === "inactive") {
-        customerUsers = customerUsers.filter((user) => !user.is_active || user.is_banned || !user.is_verified);
-      } else if (status === "isSuspend") {
-        customerUsers = customerUsers.filter((user) => user.is_suspended);
-      }
-
-      // Apply sorting
-      const sortedUsers = applySorting(customerUsers);
-      setUsers(sortedUsers);
+      // Backend already applies filtering/sorting based on query params
+      setUsers(data.users || []);
       setTotalPages(data.total_pages || 1);
-      setTotalCount(data.total || customerUsers.length || 0);
-      setPageSize(data.page_size || 10);
+      setTotalCount(data.total ?? 0);
+      setPageSize(data.page_size || pageSize);
     } catch (error) {
       console.error("Failed to fetch users:", error);
       notifyError(error.response?.data?.detail || "Failed to fetch users");
@@ -144,67 +135,25 @@ function Users() {
     }
   };
 
-  const applySorting = (items) => {
-    // If no sorting is selected, return items as-is
-    if (joinDateSort === "none" && listingsSort === "none") {
-      return items;
-    }
-
-    let sortedItems = [...items];
-
-    // Apply sorting based on priority: join date first, then listings count
-    sortedItems.sort((a, b) => {
-      // Primary sort: Join Date
-      if (joinDateSort === "most-recent") {
-        const dateA = new Date(a.created_at || 0).getTime();
-        const dateB = new Date(b.created_at || 0).getTime();
-        if (dateA !== dateB) {
-          return dateB - dateA; // Most recent first
-        }
-      } else if (joinDateSort === "least-recent") {
-        const dateA = new Date(a.created_at || 0).getTime();
-        const dateB = new Date(b.created_at || 0).getTime();
-        if (dateA !== dateB) {
-          return dateA - dateB; // Least recent first
-        }
-      }
-
-      // Secondary sort: Listings Count (applies when dates are equal or join date sort is not active)
-      if (listingsSort === "most") {
-        const countA = a.listings_count || 0;
-        const countB = b.listings_count || 0;
-        if (countA !== countB) {
-          return countB - countA; // Most listings first
-        }
-      } else if (listingsSort === "least") {
-        const countA = a.listings_count || 0;
-        const countB = b.listings_count || 0;
-        if (countA !== countB) {
-          return countA - countB; // Least listings first
-        }
-      }
-
-      return 0;
-    });
-
-    return sortedItems;
-  };
-
   const handleClearFilters = () => {
     setSearchTerm("");
     setStatus("all");
-    setJoinDateSort("none");
-    setListingsSort("none");
+    setJoinDateSort("all");
+    setListingsSort("all");
     setCurrentPage(1);
   };
 
   const STATUS_OPTIONS = [
     { value: "all", label: "All Status" },
     { value: "active", label: "Active" },
-    { value: "isSuspend", label: "Suspended" },
+    { value: "suspended", label: "Suspended" },
   ];
 
-  const hasActiveFilters = searchTerm || (status && status !== "all") || joinDateSort !== "none" || listingsSort !== "none";
+  const hasActiveFilters =
+    searchTerm ||
+    (status && status !== "all") ||
+    joinDateSort !== "all" ||
+    listingsSort !== "all";
 
   const handleEditUser = async (user) => {
     setEditUser({ ...user });
@@ -675,7 +624,12 @@ function Users() {
               Filters
               {hasActiveFilters && (
                 <Badge variant="secondary" className="ml-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs">
-                  {[searchTerm, status && status !== "all" ? status : null, joinDateSort !== "none" ? "join" : null, listingsSort !== "none" ? "listings" : null].filter(Boolean).length}
+                  {[
+                    searchTerm,
+                    status && status !== "all" ? status : null,
+                    joinDateSort !== "all" ? "join" : null,
+                    listingsSort !== "all" ? "listings" : null
+                  ].filter(Boolean).length}
                 </Badge>
               )}
             </Button>
@@ -741,9 +695,9 @@ function Users() {
                     <SelectValue placeholder="No sorting" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">No sorting</SelectItem>
-                    <SelectItem value="most-recent">Most Recent</SelectItem>
-                    <SelectItem value="least-recent">Least Recent</SelectItem>
+                    <SelectItem value="all">No sorting</SelectItem>
+                    <SelectItem value="most_recent">Most Recent</SelectItem>
+                    <SelectItem value="least_recent">Least Recent</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -757,9 +711,9 @@ function Users() {
                     <SelectValue placeholder="No sorting" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">No sorting</SelectItem>
-                    <SelectItem value="most">Most Listings</SelectItem>
-                    <SelectItem value="least">Least Listings</SelectItem>
+                    <SelectItem value="all">No sorting</SelectItem>
+                    <SelectItem value="most_recent">Most Listings</SelectItem>
+                    <SelectItem value="least_recent">Least Listings</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
