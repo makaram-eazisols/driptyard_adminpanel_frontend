@@ -124,27 +124,14 @@ function Products() {
         }
       }
 
+      if (sortOrder && sortOrder !== "none") {
+        params.sort_by = sortOrder === "low-to-high" ? "low_to_high" : "high_to_low";
+      } else {
+        params.sort_by = null;
+      }
+
       const data = await apiClient.getAdminProducts(params);
       let items = data.products || [];
-
-      // Apply client-side filtering if needed
-      if (status === "active") {
-        items = items.filter((product) => product.is_active);
-      } else if (status === "inactive") {
-        items = items.filter((product) => !product.is_active);
-      }
-
-      if (verification === "verified") {
-        items = items.filter((product) => product.is_verified);
-      } else if (verification === "unverified") {
-        items = items.filter((product) => !product.is_verified);
-      }
-
-      if (spotlighted === "spotlighted") {
-        items = items.filter((product) => product.is_spotlighted);
-      } else if (spotlighted === "not-spotlighted") {
-        items = items.filter((product) => !product.is_spotlighted);
-      }
 
       setProducts(items);
       setTotalPages(data.total_pages || 1);
@@ -192,30 +179,9 @@ function Products() {
 
   const hasActiveFilters = searchQuery || (status && status !== "all") || (verification && verification !== "all") || (spotlighted && spotlighted !== "all") || (sortOrder && sortOrder !== "none");
 
-  // Sort products by price
-  const getSortedProducts = (productsList) => {
-    if (sortOrder === "none") {
-      return productsList;
-    }
-
-    const sorted = [...productsList].sort((a, b) => {
-      const priceA = Number(a.price) || 0;
-      const priceB = Number(b.price) || 0;
-
-      if (sortOrder === "low-to-high") {
-        return priceA - priceB;
-      } else if (sortOrder === "high-to-low") {
-        return priceB - priceA;
-      }
-      return 0;
-    });
-
-    return sorted;
-  };
-
   useEffect(() => {
     fetchProducts();
-  }, [page, searchQuery, status, verification, spotlighted]);
+  }, [page, searchQuery, status, verification, spotlighted, sortOrder]);
 
   useEffect(() => {
     if (spotlightProduct) {
@@ -875,7 +841,7 @@ function Products() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {getSortedProducts(products).map((product) => {
+                    {products.map((product) => {
                       const image = getPrimaryImage(product);
                       const authBadge = getAuthBadge(product);
                       const productId = product.id;

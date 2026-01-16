@@ -552,7 +552,7 @@ function FlaggedContent() {
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent>
-                            <p>Report has been approved and resolved</p>
+                            <p>Report accepted, listings deactivated</p>
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
@@ -744,7 +744,7 @@ function FlaggedContent() {
                                           </DropdownMenuItem>
                                         </TooltipTrigger>
                                         <TooltipContent>
-                                          <p>Report has been approved and resolved</p>
+                                          <p>Report accepted, listings deactivated</p>
                                         </TooltipContent>
                                       </Tooltip>
                                     </TooltipProvider>
