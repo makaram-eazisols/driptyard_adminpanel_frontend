@@ -12,6 +12,7 @@ import {
   ChevronRight,
   Shield,
   FileText,
+  ShoppingCart,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { cn } from "@/lib/utils";
@@ -76,6 +77,11 @@ const buildMenuItems = (user) => {
 
   if (can("can_see_flagged_content")) {
     items.push({ title: "Flagged Content", url: "/admin/flagged", icon: Flag });
+  }
+
+  // Orders - typically admin only
+  if (isAdmin || user?.role === "admin") {
+    items.push({ title: "Orders", url: "/admin/orders", icon: ShoppingCart });
   }
 
   // Logs & Audit Trails - typically admin only

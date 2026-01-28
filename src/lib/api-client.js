@@ -301,6 +301,11 @@ class ApiClient {
     return response.data;
   }
 
+  async getAdminOrders(params) {
+    const response = await this.client.get("/admin/orders", { params });
+    return response.data;
+  }
+
   async updateAdminUser(userId, data) {
     const response = await this.client.put(`/admin/users/${userId}`, data);
     return response.data;
