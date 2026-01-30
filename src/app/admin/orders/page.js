@@ -6,7 +6,7 @@ import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Filter, ChevronLeft, ChevronRight, Loader2, X, AlertCircle } from "lucide-react";
+import { Search, Filter, ChevronLeft, ChevronRight, Loader2, X, AlertCircle, HelpCircle } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { apiClient } from "@/lib/api-client";
 import { notifyError } from "@/lib/toast";
 import { format, parseISO } from "date-fns";
@@ -121,6 +122,14 @@ function Orders() {
     }).format(numAmount);
   };
 
+  const truncateText = (text, maxLength = 30) => {
+    if (!text) return "—";
+    if (text.length <= maxLength) return text;
+    return `${text.slice(0, Math.max(0, maxLength - 3))}...`;
+  };
+
+  const REPORT_PREVIEW_LENGTH = 30;
+
   return (
     <AdminLayout>
       <div className="space-y-6">
@@ -210,7 +219,8 @@ function Orders() {
               </div>
             ) : (
               <>
-                <Table>
+                <TooltipProvider>
+                  <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Order ID</TableHead>
@@ -232,6 +242,8 @@ function Orders() {
                       const orderTotal = order.total_amount || 0;
                       const orderStatus = order.status || "pending";
                       const orderReport = order.order_report;
+                      const reportReason = orderReport?.reason || "";
+                      const isReportTruncated = reportReason.length > REPORT_PREVIEW_LENGTH;
 
                       return (
                         <TableRow key={order.id || orderId}>
@@ -252,13 +264,26 @@ function Orders() {
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            {orderReport ? (
-                              <div className="flex items-center gap-2">
-                                {/* <AlertCircle className="h-4 w-4 text-[#E74C3C]" /> */}
-                                <span className="text-sm text-foreground">
-                                  {orderReport.reason || "No reason provided"}
-                                </span>
-                              </div>
+                            {reportReason ? (
+                              isReportTruncated ? (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="group inline-flex items-center gap-1 text-sm text-foreground cursor-help">
+                                      {truncateText(reportReason, REPORT_PREVIEW_LENGTH)}
+                                      {/* <HelpCircle className="h-3 w-3 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" /> */}
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p className="max-w-xs text-sm text-foreground">
+                                      {reportReason}
+                                    </p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              ) : (
+                                <span className="text-sm text-foreground">{reportReason}</span>
+                              )
+                            ) : orderReport ? (
+                              <span className="text-sm text-foreground">No reason provided</span>
                             ) : (
                               <span className="text-muted-foreground">—</span>
                             )}
@@ -272,7 +297,8 @@ function Orders() {
                       );
                     })}
                   </TableBody>
-                </Table>
+                  </Table>
+                </TooltipProvider>
 
                 {/* Pagination */}
                 {totalPages > 1 && (

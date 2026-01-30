@@ -54,11 +54,15 @@ function Products() {
   const [verification, setVerification] = useState("all");
   const [spotlighted, setSpotlighted] = useState("all");
   const [sortOrder, setSortOrder] = useState("none");
+  const [sellerId, setSellerId] = useState("all");
   const [showFilters, setShowFilters] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [pageSize, setPageSize] = useState(10);
+  const [sellers, setSellers] = useState([]);
+  const [sellersLoading, setSellersLoading] = useState(false);
+  const [sellersError, setSellersError] = useState("");
   const [deleteProductId, setDeleteProductId] = useState(null);
   const [editProduct, setEditProduct] = useState(null);
   const [editLoading, setEditLoading] = useState(false);
@@ -90,6 +94,30 @@ function Products() {
 
   // Check manage listings permission
   const canManageListings = user?.is_admin || user?.permissions?.can_manage_listings === true;
+
+  const fetchSellers = async () => {
+    try {
+      setSellersLoading(true);
+      setSellersError("");
+      const data = await apiClient.getAdminUsers({
+        is_seller: true,
+        page_size: 100,
+      });
+      const users = data.users || [];
+      const normalized = users
+        .map((seller) => ({
+          id: seller.id ?? seller.user_id,
+          username: seller.username || "",
+        }))
+        .filter((seller) => seller.id);
+      setSellers(normalized);
+    } catch (error) {
+      setSellers([]);
+      setSellersError(error.response?.data?.detail || "Failed to load sellers");
+    } finally {
+      setSellersLoading(false);
+    }
+  };
 
   const fetchProducts = async () => {
     try {
@@ -130,6 +158,10 @@ function Products() {
         params.sort_by = null;
       }
 
+      if (sellerId && sellerId !== "all") {
+        params.user_id = sellerId;
+      }
+
       const data = await apiClient.getAdminProducts(params);
       let items = data.products || [];
 
@@ -150,6 +182,7 @@ function Products() {
     setVerification("all");
     setSpotlighted("all");
     setSortOrder("none");
+    setSellerId("all");
     setPage(1);
   };
 
@@ -177,11 +210,15 @@ function Products() {
     { value: "high-to-low", label: "Price: High to Low" },
   ];
 
-  const hasActiveFilters = searchQuery || (status && status !== "all") || (verification && verification !== "all") || (spotlighted && spotlighted !== "all") || (sortOrder && sortOrder !== "none");
+  const hasActiveFilters = searchQuery || (status && status !== "all") || (verification && verification !== "all") || (spotlighted && spotlighted !== "all") || (sortOrder && sortOrder !== "none") || (sellerId && sellerId !== "all");
 
   useEffect(() => {
     fetchProducts();
-  }, [page, searchQuery, status, verification, spotlighted, sortOrder]);
+  }, [page, searchQuery, status, verification, spotlighted, sortOrder, sellerId]);
+
+  useEffect(() => {
+    fetchSellers();
+  }, []);
 
   useEffect(() => {
     if (spotlightProduct) {
@@ -334,7 +371,7 @@ function Products() {
     fetchProducts();
     // Clear selection when filters change
     setSelectedProducts(new Set());
-  }, [page, searchQuery, status, verification, spotlighted]);
+  }, [page, searchQuery, status, verification, spotlighted, sortOrder, sellerId]);
 
   // Bulk selection handlers
   const handleSelectAll = (checked) => {
@@ -613,7 +650,7 @@ function Products() {
               Filters
               {hasActiveFilters && (
                 <Badge variant="secondary" className="ml-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs">
-                  {[searchQuery, status && status !== "all" ? status : null, verification && verification !== "all" ? verification : null, spotlighted && spotlighted !== "all" ? spotlighted : null, sortOrder && sortOrder !== "none" ? sortOrder : null].filter(Boolean).length}
+                    {[searchQuery, status && status !== "all" ? status : null, verification && verification !== "all" ? verification : null, spotlighted && spotlighted !== "all" ? spotlighted : null, sortOrder && sortOrder !== "none" ? sortOrder : null, sellerId && sellerId !== "all" ? sellerId : null].filter(Boolean).length}
                 </Badge>
               )}
             </Button>
@@ -641,6 +678,40 @@ function Products() {
                     setPage(1);
                   }}
                 />
+              </div>
+              <div className="space-y-2 w-full md:w-auto md:min-w-[220px]">
+                <Label htmlFor="seller">Seller</Label>
+                <Select
+                  value={sellerId}
+                  onValueChange={(value) => {
+                    setSellerId(value);
+                    setPage(1);
+                  }}
+                >
+                  <SelectTrigger
+                    id="seller"
+                    disabled={sellersLoading}
+                  >
+                    <SelectValue placeholder="Select seller" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Sellers</SelectItem>
+                    {sellers.map((seller) => (
+                      <SelectItem key={seller.id} value={String(seller.id)}>
+                        {seller.username ? `@${seller.username}` : `User #${seller.id}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {(sellersLoading || sellersError || sellers.length === 0) && (
+                  <p className="text-xs text-muted-foreground">
+                    {sellersLoading
+                      ? "Loading sellers..."
+                      : sellersError
+                        ? "Unable to load sellers"
+                        : "No sellers found"}
+                  </p>
+                )}
               </div>
               <div className="space-y-2 w-full md:w-auto md:min-w-[200px]">
                 <Label htmlFor="status">Status</Label>
