@@ -26,6 +26,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Check, ChevronsUpDown } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -37,6 +39,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const CONDITIONS = [
   { value: "New", label: "New" },
@@ -63,6 +66,7 @@ function Products() {
   const [sellers, setSellers] = useState([]);
   const [sellersLoading, setSellersLoading] = useState(false);
   const [sellersError, setSellersError] = useState("");
+  const [sellerComboboxOpen, setSellerComboboxOpen] = useState(false);
   const [deleteProductId, setDeleteProductId] = useState(null);
   const [editProduct, setEditProduct] = useState(null);
   const [editLoading, setEditLoading] = useState(false);
@@ -376,13 +380,19 @@ function Products() {
   // Bulk selection handlers
   const handleSelectAll = (checked) => {
     if (checked) {
-      setSelectedProducts(new Set(products.map((p) => p.id)));
+      // Only allow selecting products whose owners are not suspended
+      const selectableIds = products.filter((p) => !p.is_suspended).map((p) => p.id);
+      setSelectedProducts(new Set(selectableIds));
     } else {
       setSelectedProducts(new Set());
     }
   };
 
   const handleSelectProduct = (productId, checked) => {
+    const product = products.find((p) => p.id === productId);
+    // Do not allow selecting products whose owners are suspended
+    if (product?.is_suspended) return;
+
     const newSelected = new Set(selectedProducts);
     if (checked) {
       newSelected.add(productId);
@@ -392,8 +402,11 @@ function Products() {
     setSelectedProducts(newSelected);
   };
 
-  const isAllSelected = products.length > 0 && selectedProducts.size === products.length;
-  const isIndeterminate = selectedProducts.size > 0 && selectedProducts.size < products.length;
+  const selectableProducts = products.filter((p) => !p.is_suspended);
+  const selectableSelectedCount = selectableProducts.filter((p) => selectedProducts.has(p.id)).length;
+  const isAllSelected = selectableProducts.length > 0 && selectableSelectedCount === selectableProducts.length;
+  const isIndeterminate =
+    selectableSelectedCount > 0 && selectableSelectedCount < selectableProducts.length;
 
   // Check if all selected products are verified
   const areAllSelectedVerified = () => {
@@ -632,6 +645,15 @@ function Products() {
     return `$${numeric.toFixed(2)}`;
   };
 
+  const getSelectedSellerDisplay = () => {
+    if (sellerId === "all") return "All Sellers";
+    const selectedSeller = sellers.find((s) => String(s.id) === sellerId);
+    if (selectedSeller) {
+      return selectedSeller.username ? `@${selectedSeller.username}` : `User #${selectedSeller.id}`;
+    }
+    return "Select seller";
+  };
+
   return (
     <AdminLayout>
       <div className="space-y-6">
@@ -681,36 +703,75 @@ function Products() {
               </div>
               <div className="space-y-2 w-full md:w-auto md:min-w-[220px]">
                 <Label htmlFor="seller">Seller</Label>
-                <Select
-                  value={sellerId}
-                  onValueChange={(value) => {
-                    setSellerId(value);
-                    setPage(1);
-                  }}
-                >
-                  <SelectTrigger
-                    id="seller"
-                    disabled={sellersLoading}
-                  >
-                    <SelectValue placeholder="Select seller" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Sellers</SelectItem>
-                    {sellers.map((seller) => (
-                      <SelectItem key={seller.id} value={String(seller.id)}>
-                        {seller.username ? `@${seller.username}` : `User #${seller.id}`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {(sellersLoading || sellersError || sellers.length === 0) && (
-                  <p className="text-xs text-muted-foreground">
-                    {sellersLoading
-                      ? "Loading sellers..."
-                      : sellersError
-                        ? "Unable to load sellers"
-                        : "No sellers found"}
-                  </p>
+                <Popover open={sellerComboboxOpen} onOpenChange={setSellerComboboxOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={sellerComboboxOpen}
+                      className="w-full justify-between bg-background hover:bg-background border-border text-foreground hover:text-foreground"
+                      disabled={sellersLoading}
+                      id="seller"
+                    >
+                      {sellersLoading ? (
+                        <span className="text-muted-foreground">Loading...</span>
+                      ) : (
+                        <span className="truncate">{getSelectedSellerDisplay()}</span>
+                      )}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[220px] p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Search sellers..." />
+                      <CommandList>
+                        <CommandEmpty>No sellers found.</CommandEmpty>
+                        <CommandGroup>
+                          <CommandItem
+                            value="all"
+                            className="data-[selected=true]:bg-[#E0B74F] data-[selected=true]:text-[#0B0B0D] hover:text-[#0B0B0D]"
+                            onSelect={() => {
+                              setSellerId("all");
+                              setSellerComboboxOpen(false);
+                              setPage(1);
+                            }}
+                          >
+                            <Check
+                              className={`mr-2 h-4 w-4 ${sellerId === "all" ? "opacity-100" : "opacity-0"} `}
+                            />
+                            All Sellers
+                          </CommandItem>
+                          {sellers.map((seller) => {
+                            const sellerValue = String(seller.id);
+                            const isSelected = sellerId === sellerValue;
+                            const displayText = seller.username ? `@${seller.username}` : `User #${seller.id}`;
+                            // Include username in value for searchability
+                            const searchableValue = seller.username 
+                              ? `${sellerValue} ${seller.username} @${seller.username}` 
+                              : `${sellerValue} User #${seller.id}`;
+                            return (
+                              <CommandItem
+                                key={seller.id}
+                                value={searchableValue}
+                                className="data-[selected=true]:bg-[#E0B74F] data-[selected=true]:text-[#0B0B0D] hover:text-[#0B0B0D]"
+                                onSelect={() => {
+                                  setSellerId(sellerValue);
+                                  setSellerComboboxOpen(false);
+                                  setPage(1);
+                                }}
+                              >
+                                <Check className={`mr-2 h-4 w-4 ${isSelected ? "opacity-100" : "opacity-0"}`} />
+                                {displayText}
+                              </CommandItem>
+                            );
+                          })}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+                {sellersError && (
+                  <p className="text-xs text-muted-foreground">Unable to load sellers</p>
                 )}
               </div>
               <div className="space-y-2 w-full md:w-auto md:min-w-[200px]">
@@ -896,6 +957,9 @@ function Products() {
                         <TableHead className="h-12 px-4 w-12">
                           <Checkbox
                             checked={isAllSelected}
+                            // indeterminate state for partial selection
+                            // @ts-ignore - shadcn Checkbox supports this prop
+                            indeterminate={isIndeterminate}
                             onCheckedChange={handleSelectAll}
                           />
                         </TableHead>
@@ -938,10 +1002,28 @@ function Products() {
                         >
                           {(canManageListings || canSpotlight) && (
                             <TableCell className="py-3 px-4">
-                              <Checkbox
-                                checked={selectedProducts.has(product.id)}
-                                onCheckedChange={(checked) => handleSelectProduct(product.id, checked)}
-                              />
+                              {product.is_suspended ? (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <div>
+                                        <Checkbox
+                                          checked={selectedProducts.has(product.id)}
+                                          disabled
+                                        />
+                                      </div>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p className="text-xs">User is suspended. Actions are disabled.</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              ) : (
+                                <Checkbox
+                                  checked={selectedProducts.has(product.id)}
+                                  onCheckedChange={(checked) => handleSelectProduct(product.id, checked)}
+                                />
+                              )}
                             </TableCell>
                           )}
                           <TableCell className="py-3 px-4 max-w-[100px]">
@@ -990,65 +1072,87 @@ function Products() {
                           {(canManageListings || canSpotlight) && (
                             <TableCell className="py-3 px-4 text-right max-w-[100px]">
                               {(canManageListings || (product.is_verified && canSpotlight)) && (
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                                      <MoreVertical className="h-4 w-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
-                                    <DropdownMenuItem
-                                      className="cursor-pointer"
-                                      onClick={() => {
-                                        const websiteUrl = process.env.NEXT_PUBLIC_WEBSITE_URL || "https://driptyard.vercel.app";
-                                        let baseUrl = websiteUrl.endsWith('/') ? websiteUrl.slice(0, -1) : websiteUrl;
-                                        if (!baseUrl.endsWith('/products')) {
-                                          baseUrl = `${baseUrl}/products`;
-                                        }
-                                        const productUrl = product.id ? `${baseUrl}/${product.id}` : null;
-                                        if (productUrl) {
-                                          window.open(productUrl, "_blank");
-                                        }
-                                      }}
-                                    >
-                                      <Eye className="h-4 w-4 mr-2" />
-                                      View
-                                    </DropdownMenuItem>
-                                    {product.is_verified && product.is_active && !product.is_spotlighted && canSpotlight && (
+                                product.is_suspended ? (
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <div>
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8 cursor-not-allowed opacity-60"
+                                            disabled
+                                          >
+                                            <MoreVertical className="h-4 w-4" />
+                                          </Button>
+                                        </div>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        <p className="text-xs">Seller is suspended. Actions are disabled.</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                ) : (
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                                        <MoreVertical className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
                                       <DropdownMenuItem
-                                        className="cursor-pointer group flex items-center gap-2 hover:bg-[#E0B74F] hover:text-[#0B0B0D] focus:bg-[#E0B74F] focus:text-[#0B0B0D] transition-colors"
-                                        onClick={() => setSpotlightProduct(product)}
+                                        className="cursor-pointer"
+                                        onClick={() => {
+                                          const websiteUrl = process.env.NEXT_PUBLIC_WEBSITE_URL || "https://driptyard.vercel.app";
+                                          let baseUrl = websiteUrl.endsWith('/') ? websiteUrl.slice(0, -1) : websiteUrl;
+                                          if (!baseUrl.endsWith('/products')) {
+                                            baseUrl = `${baseUrl}/products`;
+                                          }
+                                          const productUrl = product.id ? `${baseUrl}/${product.id}` : null;
+                                          if (productUrl) {
+                                            window.open(productUrl, "_blank");
+                                          }
+                                        }}
                                       >
-                                        <Star className="h-4 w-4 text-accent transition-colors group-hover:text-[#0B0B0D] group-focus:text-[#0B0B0D]" />
-                                        Spotlight
+                                        <Eye className="h-4 w-4 mr-2" />
+                                        View
                                       </DropdownMenuItem>
-                                    )}
-                                    {canManageListings && (
-                                      <>
-                                        <DropdownMenuItem className="cursor-pointer" onClick={() => setEditProduct(product)}>
-                                          <Edit2 className="h-4 w-4 mr-2" />
-                                          Edit
-                                        </DropdownMenuItem>
-                                        {/* {product.is_active && (
-                                            <DropdownMenuItem
-                                              className="text-destructive cursor-pointer focus:text-destructive"
-                                              onClick={() => handleQuickDisable(product.id)}
-                                            >
-                                              <X className="h-4 w-4 mr-2" />
-                                              Make Disable
-                                            </DropdownMenuItem>
-                                          )} */}
+                                      {product.is_verified && product.is_active && !product.is_spotlighted && canSpotlight && (
                                         <DropdownMenuItem
-                                          className="text-destructive cursor-pointer focus:text-destructive"
-                                          onClick={() => setDeleteProductId(product.id)}
+                                          className="cursor-pointer group flex items-center gap-2 hover:bg-[#E0B74F] hover:text-[#0B0B0D] focus:bg-[#E0B74F] focus:text-[#0B0B0D] transition-colors"
+                                          onClick={() => setSpotlightProduct(product)}
                                         >
-                                          <Trash2 className="h-4 w-4 mr-2" />
-                                          Delete
+                                          <Star className="h-4 w-4 text-accent transition-colors group-hover:text-[#0B0B0D] group-focus:text-[#0B0B0D]" />
+                                          Spotlight
                                         </DropdownMenuItem>
-                                      </>
-                                    )}
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
+                                      )}
+                                      {canManageListings && (
+                                        <>
+                                          <DropdownMenuItem className="cursor-pointer" onClick={() => setEditProduct(product)}>
+                                            <Edit2 className="h-4 w-4 mr-2" />
+                                            Edit
+                                          </DropdownMenuItem>
+                                          {/* {product.is_active && (
+                                              <DropdownMenuItem
+                                                className="text-destructive cursor-pointer focus:text-destructive"
+                                                onClick={() => handleQuickDisable(product.id)}
+                                              >
+                                                <X className="h-4 w-4 mr-2" />
+                                                Make Disable
+                                              </DropdownMenuItem>
+                                            )} */}
+                                          <DropdownMenuItem
+                                            className="text-destructive cursor-pointer focus:text-destructive"
+                                            onClick={() => setDeleteProductId(product.id)}
+                                          >
+                                            <Trash2 className="h-4 w-4 mr-2" />
+                                            Delete
+                                          </DropdownMenuItem>
+                                        </>
+                                      )}
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                )
                               )}
                             </TableCell>
                           )}
