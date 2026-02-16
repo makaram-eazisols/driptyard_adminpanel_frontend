@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Filter, ChevronLeft, ChevronRight, Loader2, X, AlertCircle, HelpCircle } from "lucide-react";
+import { Search, Filter, Loader2, CheckCircle, ExternalLink } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -16,177 +16,123 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { apiClient } from "@/lib/api-client";
-import { notifyError } from "@/lib/toast";
-import { format, parseISO } from "date-fns";
+import { notifySuccess, notifyError } from "@/lib/toast";
 
-const SUCCESS_ORDER_STATUSES = ["completed", "shipped", "delivered", "paid"];
+const STATUS_OPTIONS = [
+  { label: "All Statuses", value: "all" },
+  { label: "Pending Payment", value: "PENDING_PAYMENT" },
+  { label: "Paid (Escrow)", value: "PAID_ESCROW" },
+  { label: "Confirmed", value: "CONFIRMED" },
+  { label: "Processing", value: "PROCESSING" },
+  { label: "Shipped", value: "SHIPPED" },
+  { label: "Released", value: "RELEASED" },
+  { label: "Paid Out", value: "PAID_OUT" },
+  { label: "Completed", value: "COMPLETED" },
+  { label: "Cancelled", value: "CANCELLED" },
+];
+
+const SUCCESS_STATUSES = ["completed", "paid", "paid_escrow", "released", "paid_out"];
 
 function Orders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize] = useState(12);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalCount, setTotalCount] = useState(0);
+  const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
   const [showFilters, setShowFilters] = useState(false);
-  // const [searchOrderNumber, setSearchOrderNumber] = useState("");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
-  useEffect(() => {
-    fetchOrders();
-  }, [currentPage, status]);
-
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const params = {
-        page: currentPage,
-        page_size: pageSize,
-      };
-
-      // Filter by status
-      if (status && status !== "all") {
-        params.status = status;
-      }
-
-      // Commented out search functionality
-      // if (searchOrderNumber.trim()) {
-      //   params.order_number = searchOrderNumber.trim();
-      // }
-
-      const data = await apiClient.getAdminOrders(params);
-      setOrders(data.items || []);
-      setTotalPages(data.total_pages || 1);
-      setTotalCount(data.total ?? 0);
+      const data = await apiClient.getAdminOrders({
+        page,
+        page_size: 10,
+        order_number: search || undefined,
+        status: status === "all" ? undefined : status
+      });
+      setOrders(data.items);
+      setTotalPages(data.total_pages);
     } catch (error) {
       console.error("Failed to fetch orders:", error);
-      notifyError(error.response?.data?.detail || "Failed to fetch orders");
-      setOrders([]);
-      setTotalPages(1);
-      setTotalCount(0);
+      notifyError("Failed to fetch orders");
     } finally {
       setLoading(false);
     }
+  }, [page, search, status]);
+
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
+
+  const handleReleasePayout = async (orderId) => {
+    if (confirm("Are you sure you want to release the payout for this order?")) {
+      try {
+        await apiClient.releasePayout(orderId);
+        notifySuccess("Payout released successfully");
+        fetchOrders();
+      } catch (error) {
+        notifyError(error.response?.data?.detail || "Failed to release payout");
+      }
+    }
   };
 
-  // Commented out search handlers
-  // const handleSearchChange = (e) => {
-  //   setSearchOrderNumber(e.target.value);
-  //   setCurrentPage(1);
-  // };
-
-  // const handleSearchKeyDown = (e) => {
-  //   if (e.key === "Enter") {
-  //     fetchOrders();
-  //   }
-  // };
-
-  const handleClearFilters = () => {
-    setStatus("all");
-    setCurrentPage(1);
-  };
-
-  const STATUS_OPTIONS = [
-    { value: "all", label: "All Status" },
-    { value: "processing", label: "Processing" },
-    { value: "confirmed", label: "Confirmed" },
-    { value: "shipped", label: "Shipped" },
-    // { value: "delivered", label: "Delivered" },
-    { value: "completed", label: "Completed" },
-    { value: "cancelled", label: "Cancelled" },
-  ];
-
-  const hasActiveFilters = status && status !== "all";
-
-  const formatDate = (dateString) => {
-    try {
-      if (!dateString) return "—";
-      const date = parseISO(dateString);
-      return format(date, "MMM d, yyyy");
-    } catch {
-      return dateString;
+  const handleMarkPaidOut = async (orderId) => {
+    if (confirm("Mark this order as manually paid out?")) {
+      try {
+        await apiClient.markPaidOut(orderId);
+        notifySuccess("Order marked as PAID_OUT");
+        fetchOrders();
+      } catch (error) {
+        notifyError(error.response?.data?.detail || "Failed to mark as paid out");
+      }
     }
   };
 
   const formatCurrency = (amount) => {
-    if (amount === null || amount === undefined) return "$0.00";
-    const numAmount = typeof amount === "string" ? parseFloat(amount) : amount;
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-    }).format(numAmount);
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(amount || 0);
   };
-
-  const truncateText = (text, maxLength = 30) => {
-    if (!text) return "—";
-    if (text.length <= maxLength) return text;
-    return `${text.slice(0, Math.max(0, maxLength - 3))}...`;
-  };
-
-  const REPORT_PREVIEW_LENGTH = 30;
 
   return (
     <AdminLayout>
       <div className="space-y-6">
-        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold text-secondary">Orders</h1>
-            <p className="text-muted-foreground mt-1">Track and manage customer orders</p>
+            <p className="text-muted-foreground mt-1">Track and manage customer orders and escrow payouts</p>
           </div>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setShowFilters(!showFilters)}
-              className="flex items-center gap-2"
-            >
-              <Filter className="h-4 w-4" />
-              Filters
-              {hasActiveFilters && (
-                <Badge variant="secondary" className="ml-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs">
-                  1
-                </Badge>
-              )}
-            </Button>
-            {hasActiveFilters && (
-              <Button variant="ghost" size="sm" onClick={handleClearFilters}>
-                <X className="h-4 w-4 mr-2" />
-                Clear
-              </Button>
-            )}
-          </div>
+          <Button
+            variant="outline"
+            onClick={() => setShowFilters(!showFilters)}
+            className={showFilters ? "bg-accent/10 border-accent text-accent" : ""}
+          >
+            <Filter className="h-4 w-4 mr-2" />
+            {showFilters ? "Hide Filters" : "Show Filters"}
+          </Button>
         </div>
 
-        {/* Filters */}
         {showFilters && (
           <div className="rounded-lg border border-border bg-background p-4 space-y-4">
             <div className="flex flex-wrap gap-4">
-              {/* Commented out search functionality */}
-              {/* <div className="space-y-2 w-full md:w-auto md:min-w-[250px]">
-                <Label htmlFor="search">Search</Label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="search"
-                    placeholder="Search by order number..."
-                    className="pl-10 bg-background"
-                    value={searchOrderNumber}
-                    onChange={handleSearchChange}
-                    onKeyDown={handleSearchKeyDown}
-                  />
-                </div>
-              </div> */}
               <div className="space-y-2 w-full md:w-auto md:min-w-[200px]">
                 <Label htmlFor="status">Status</Label>
                 <Select
                   value={status}
                   onValueChange={(value) => {
                     setStatus(value);
-                    setCurrentPage(1);
+                    setPage(1);
                   }}
                 >
                   <SelectTrigger id="status">
@@ -207,131 +153,141 @@ function Orders() {
 
         <Card>
           <CardContent className="p-6">
-            {loading ? (
-              <div className="space-y-4">
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <Skeleton key={i} className="h-16 w-full" />
-                ))}
+            <div className="flex items-center gap-4 mb-6">
+              <div className="relative max-w-md">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search by order number..."
+                  className="pl-10 bg-background"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && setPage(1)}
+                />
               </div>
-            ) : orders.length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground">No orders found</p>
-              </div>
-            ) : (
-              <>
-                <TooltipProvider>
-                  <Table>
-                  <TableHeader>
+            </div>
+
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Order #</TableHead>
+                    <TableHead>Product</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Total</TableHead>
+                    <TableHead>Order Status</TableHead>
+                    <TableHead>Escrow</TableHead>
+                    <TableHead>Payout Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loading ? (
                     <TableRow>
-                      <TableHead>Order ID</TableHead>
-                      <TableHead>Product</TableHead>
-                      <TableHead>Seller</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Total</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Order Report</TableHead>
-                      {/* <TableHead className="text-right">Actions</TableHead> */}
+                      <TableCell colSpan={8} className="text-center py-10">
+                        <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
+                        <p className="mt-2 text-sm text-muted-foreground">Loading orders...</p>
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {orders.map((order) => {
-                      const orderId = order.order_number || order.id || "—";
-                      const productName = order.product_details?.title || "—";
-                      const sellerName = order.product_details?.seller_username || "—";
-                      const orderDate = order.created_at || null;
-                      const orderTotal = order.total_amount || 0;
-                      const orderStatus = order.status || "pending";
-                      const orderReport = order.order_report;
-                      const reportReason = orderReport?.reason || "";
-                      const isReportTruncated = reportReason.length > REPORT_PREVIEW_LENGTH;
-
-                      return (
-                        <TableRow key={order.id || orderId}>
-                          <TableCell className="font-medium">{orderId}</TableCell>
-                          <TableCell>{productName}</TableCell>
-                          <TableCell className="text-muted-foreground">{sellerName}</TableCell>
-                          <TableCell>{formatDate(orderDate)}</TableCell>
-                          <TableCell className="font-semibold">{formatCurrency(orderTotal)}</TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={
-                                SUCCESS_ORDER_STATUSES.includes((orderStatus || "").toLowerCase())
-                                  ? "success"
-                                  : "destructive"
-                              }
-                            >
-                              {orderStatus}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            {reportReason ? (
-                              isReportTruncated ? (
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <span className="group inline-flex items-center gap-1 text-sm text-foreground cursor-help">
-                                      {truncateText(reportReason, REPORT_PREVIEW_LENGTH)}
-                                      {/* <HelpCircle className="h-3 w-3 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" /> */}
-                                    </span>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    <p className="max-w-xs text-sm text-foreground">
-                                      {reportReason}
-                                    </p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              ) : (
-                                <span className="text-sm text-foreground">{reportReason}</span>
-                              )
-                            ) : orderReport ? (
-                              <span className="text-sm text-foreground">No reason provided</span>
-                            ) : (
-                              <span className="text-muted-foreground">—</span>
-                            )}
-                          </TableCell>
-                            {/* <TableCell className="text-right">
-                              <Button variant="ghost" size="sm">
-                                View Details
+                  ) : orders.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center py-10 text-muted-foreground">
+                        No orders found
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    orders.map((order) => (
+                      <TableRow key={order.id}>
+                        <TableCell className="font-medium">{order.order_number}</TableCell>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="truncate max-w-[150px] font-medium" title={order.product_details?.title}>
+                              {order.product_details?.title}
+                            </span>
+                            <span className="text-xs text-muted-foreground">ID: {order.product_id}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>{new Date(order.created_at).toLocaleDateString()}</TableCell>
+                        <TableCell className="font-semibold">{formatCurrency(order.total_amount)}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              SUCCESS_STATUSES.includes((order.status || "").toLowerCase())
+                                ? "success"
+                                : "outline"
+                            }
+                          >
+                            {order.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={order.escrow_status === 'RELEASED' ? 'success' : 'secondary'}>
+                            {order.escrow_status || 'N/A'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={order.payout_status === 'PAID_OUT' ? 'success' : 'outline'}>
+                            {order.payout_status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            {order.status === 'PAID_ESCROW' && order.buyer_confirmed_receipt && (
+                              <Button
+                                size="sm"
+                                onClick={() => handleReleasePayout(order.id)}
+                                disabled={loading}
+                                className="bg-accent text-accent-foreground"
+                              >
+                                Release Payout
                               </Button>
-                          </TableCell> */}
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                  </Table>
-                </TooltipProvider>
+                            )}
+                            {order.status === 'RELEASED' && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={loading}
+                                onClick={() => handleMarkPaidOut(order.id)}
+                              >
+                                Mark Paid Out
+                              </Button>
+                            )}
+                            <Button variant="ghost" size="sm" asChild>
+                              <a href={`${process.env.NEXT_PUBLIC_FRONTEND_URL}/products/${order.product_id}`} target="_blank" rel="noreferrer">
+                                <ExternalLink className="h-4 w-4" />
+                              </a>
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
 
-                {/* Pagination */}
-                {totalPages > 1 && (
-                  <div className="flex justify-end mt-8">
-                    <div className="inline-flex items-center divide-x divide-border rounded-xl border border-border bg-background shadow-sm">
-                      <div className="px-4 py-2 text-sm font-medium">
-                        <span className="text-primary">
-                          {totalCount === 0
-                            ? "0"
-                            : `${(currentPage - 1) * pageSize + 1}-${Math.min(currentPage * pageSize, totalCount)}`}
-                        </span>
-                        <span className="ml-1 text-muted-foreground">of {totalCount}</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                        disabled={currentPage === 1 || loading}
-                        className="h-10 w-10 flex items-center justify-center text-muted-foreground hover:text-primary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                      >
-                        <ChevronLeft className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                        disabled={currentPage === totalPages || loading}
-                        className="h-10 w-10 flex items-center justify-center text-muted-foreground hover:text-primary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                      >
-                        <ChevronRight className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </>
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex justify-center gap-2 mt-6">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page === 1}
+                  onClick={() => setPage(page - 1)}
+                >
+                  Previous
+                </Button>
+                <span className="flex items-center text-sm px-4">
+                  Page {page} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page === totalPages}
+                  onClick={() => setPage(page + 1)}
+                >
+                  Next
+                </Button>
+              </div>
             )}
           </CardContent>
         </Card>

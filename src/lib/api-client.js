@@ -296,6 +296,21 @@ class ApiClient {
   }
 
   // ============ ADMIN USER ENDPOINTS ============
+  async getAdminOrders(params) {
+    const response = await this.client.get("/admin/orders", { params });
+    return response.data;
+  }
+
+  async releasePayout(orderId) {
+    const response = await this.client.post(`/orders/${orderId}/release-payout`);
+    return response.data;
+  }
+
+  async markPaidOut(orderId) {
+    const response = await this.client.post(`/orders/${orderId}/mark-paid-out`);
+    return response.data;
+  }
+
   async getAdminUsers(params) {
     const response = await this.client.get("/admin/users", { params });
     return response.data;
