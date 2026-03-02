@@ -311,6 +311,26 @@ class ApiClient {
     return response.data;
   }
 
+  async approveRefund(orderId) {
+    const response = await this.client.post(`/orders/${orderId}/approve-refund`);
+    return response.data;
+  }
+
+  async rejectRefund(orderId, body = {}) {
+    const response = await this.client.post(`/orders/${orderId}/reject-refund`, body);
+    return response.data;
+  }
+
+  async markRefundPaid(orderId) {
+    const response = await this.client.post(`/orders/${orderId}/mark-refund-paid`);
+    return response.data;
+  }
+
+  async autoConfirmReceipts(days = 1) {
+    const response = await this.client.post(`/orders/auto-confirm-receipts?days=${days}`);
+    return response.data;
+  }
+
   async getAdminUsers(params) {
     const response = await this.client.get("/admin/users", { params });
     return response.data;
