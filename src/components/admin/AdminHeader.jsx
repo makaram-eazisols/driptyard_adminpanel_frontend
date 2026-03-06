@@ -59,7 +59,7 @@ export const AdminHeader = () => {
   const router = useRouter();
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [notifications, setNotifications] = useState(mockNotifications);
-
+// TODO: Replace mock notifications with API calls
   const unreadCount = useMemo(() => {
     return notifications.filter((notification) => !notification.read).length;
   }, [notifications]);
