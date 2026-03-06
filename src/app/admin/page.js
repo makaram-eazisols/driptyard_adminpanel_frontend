@@ -2,6 +2,7 @@
 
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { StatCard } from "@/components/admin/StatCard";
+import { MembershipPlansCard } from "@/components/admin/MembershipPlansCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Users2, Package2, AlertCircle, Flag, Trash2 } from "lucide-react";
@@ -23,7 +24,7 @@ export default function Dashboard() {
         const data = await apiClient.getAdminStatsOverview();
         console.log("📊 Dashboard API Response:", data);
         setStats(data);
-        
+
         // Transform products growth data for chart
         if (data?.products_growth_data && Array.isArray(data.products_growth_data)) {
           const transformedProducts = data.products_growth_data.map((item) => ({
@@ -36,7 +37,7 @@ export default function Dashboard() {
         } else {
           console.warn("⚠️ No products_growth_data in API response");
         }
-        
+
         // Transform users growth data for chart
         if (data?.users_growth_data && Array.isArray(data.users_growth_data)) {
           const transformedUsers = data.users_growth_data.map((item) => ({
@@ -81,22 +82,49 @@ export default function Dashboard() {
       <div className="space-y-6">
         {loading ? (
           <>
-            {/* Loading skeleton for stat cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {[1, 2, 3, 4].map((i) => (
-                <Card key={i} className="shadow-md">
-                  <CardContent className="p-5">
-                    <div className="flex items-center justify-between mb-4">
-                      <Skeleton className="w-11 h-11 rounded-lg" />
-                      <Skeleton className="h-6 w-16 rounded-md" />
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+              {/* Left Column - 2x2 Grid of Stat Cards */}
+              <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
+                {[1, 2, 3, 4].map((i) => (
+                  <Card key={i} className="shadow-md">
+                    <CardContent className="p-5">
+                      <div className="flex items-center justify-between mb-4">
+                        <Skeleton className="w-11 h-11 rounded-lg" />
+                        <Skeleton className="h-6 w-16 rounded-md" />
+                      </div>
+                      <div className="space-y-2">
+                        <Skeleton className="h-4 w-24" />
+                        <Skeleton className="h-8 w-20" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              {/* Right Column - Membership Card Skeleton */}
+              <div className="lg:col-span-2 lg:row-span-2">
+                <Card className="h-full shadow-md">
+                  <CardContent className="p-6">
+                    <div className="flex items-start gap-4 mb-6">
+                      <Skeleton className="w-12 h-12 rounded-xl" />
+                      <div className="space-y-2">
+                        <Skeleton className="h-6 w-48" />
+                        <Skeleton className="h-4 w-64" />
+                      </div>
                     </div>
-                    <div className="space-y-2">
+                    <Skeleton className="h-2.5 w-full rounded-full mb-8" />
+                    <div className="grid grid-cols-3 gap-4 mb-6">
+                      {[1, 2, 3].map((i) => (
+                        <Skeleton key={i} className="h-24 rounded-2xl" />
+                      ))}
+                    </div>
+                    <div className="pt-4 border-t flex justify-between">
                       <Skeleton className="h-4 w-24" />
-                      <Skeleton className="h-8 w-20" />
+                      <Skeleton className="h-6 w-12" />
                     </div>
                   </CardContent>
                 </Card>
-              ))}
+              </div>
             </div>
             {/* Loading skeleton for charts */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -119,39 +147,47 @@ export default function Dashboard() {
           </>
         ) : (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <StatCard
-                title="Total Users"
-                value={stats?.total_users?.toString() || "0"}
-                change={formatChange(stats?.users_change)}
-                icon={Users2}
-                trend={stats?.users_change >= 0 ? "up" : "down"}
-                href="/admin/users"
-              />
-              <StatCard
-                title="Total active listings"
-                value={stats?.total_products?.toString() || "0"}
-                change={formatChange(stats?.products_change)}
-                icon={Package2}
-                trend={stats?.products_change >= 0 ? "up" : "down"}
-                href="/admin/products"
-              />
-              <StatCard
-                title="Total Listings Removed"
-                value={stats?.total_listings_removed?.toString() || "0"}
-                change={formatChange(stats?.listings_removed_change)}
-                icon={Trash2}
-                trend={stats?.listings_removed_change >= 0 ? "up" : "down"}
-                href="/admin/products"
-              />
-              <StatCard
-                title="Flagged Content"
-                value={stats?.flagged_content_count?.toString() || "0"}
-                change={formatChange(stats?.flagged_content_change)}
-                icon={Flag}
-                trend={stats?.flagged_content_change >= 0 ? "up" : "down"}
-                href="/admin/flagged"
-              />
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-stretch">
+              {/* Left Side: Stat Cards in 2x2 grid */}
+              <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6 h-full">
+                <StatCard
+                  title="Total Users"
+                  value={stats?.total_users?.toString() || "0"}
+                  change={formatChange(stats?.users_change)}
+                  icon={Users2}
+                  trend={stats?.users_change >= 0 ? "up" : "down"}
+                  href="/admin/users"
+                />
+                <StatCard
+                  title="Total active listings"
+                  value={stats?.total_products?.toString() || "0"}
+                  change={formatChange(stats?.products_change)}
+                  icon={Package2}
+                  trend={stats?.products_change >= 0 ? "up" : "down"}
+                  href="/admin/products"
+                />
+                <StatCard
+                  title="Total Listings Removed"
+                  value={stats?.total_listings_removed?.toString() || "0"}
+                  change={formatChange(stats?.listings_removed_change)}
+                  icon={Trash2}
+                  trend={stats?.listings_removed_change >= 0 ? "up" : "down"}
+                  href="/admin/products"
+                />
+                <StatCard
+                  title="Flagged Content"
+                  value={stats?.flagged_content_count?.toString() || "0"}
+                  change={formatChange(stats?.flagged_content_change)}
+                  icon={Flag}
+                  trend={stats?.flagged_content_change >= 0 ? "up" : "down"}
+                  href="/admin/flagged"
+                />
+              </div>
+
+              {/* Right Side: Membership Card spanning 2 rows height */}
+              <div className="lg:col-span-2 lg:row-span-1">
+                <MembershipPlansCard stats={stats} />
+              </div>
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
               {/* Total Products Chart */}
@@ -173,25 +209,25 @@ export default function Dashboard() {
                       <BarChart data={productsChartData}>
                         <defs>
                           <linearGradient id="colorProducts" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#1F4E79" stopOpacity={0.9}/>
-                            <stop offset="95%" stopColor="#1F4E79" stopOpacity={0.6}/>
+                            <stop offset="5%" stopColor="#1F4E79" stopOpacity={0.9} />
+                            <stop offset="95%" stopColor="#1F4E79" stopOpacity={0.6} />
                           </linearGradient>
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" stroke="#E5E5E5" />
-                        <XAxis 
-                          dataKey="date" 
+                        <XAxis
+                          dataKey="date"
                           stroke="#333333"
                           style={{ fontSize: '11px', fontFamily: 'Inter' }}
                           angle={-45}
                           textAnchor="end"
                           height={80}
                         />
-                        <YAxis 
+                        <YAxis
                           stroke="#333333"
                           style={{ fontSize: '12px', fontFamily: 'Inter' }}
                         />
-                        <Tooltip 
-                          contentStyle={{ 
+                        <Tooltip
+                          contentStyle={{
                             backgroundColor: '#F8F8F8',
                             border: '1px solid #E0B74F',
                             borderRadius: '8px',
@@ -204,9 +240,9 @@ export default function Dashboard() {
                             return [value, name];
                           }}
                         />
-                        <Bar 
-                          dataKey="count" 
-                          fill="url(#colorProducts)" 
+                        <Bar
+                          dataKey="count"
+                          fill="url(#colorProducts)"
                           radius={[8, 8, 0, 0]}
                           maxBarSize={60}
                         />
@@ -243,25 +279,25 @@ export default function Dashboard() {
                       <AreaChart data={usersChartData}>
                         <defs>
                           <linearGradient id="colorUsers" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#2ECC71" stopOpacity={0.8}/>
-                            <stop offset="95%" stopColor="#2ECC71" stopOpacity={0.1}/>
+                            <stop offset="5%" stopColor="#2ECC71" stopOpacity={0.8} />
+                            <stop offset="95%" stopColor="#2ECC71" stopOpacity={0.1} />
                           </linearGradient>
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" stroke="#E5E5E5" />
-                        <XAxis 
-                          dataKey="date" 
+                        <XAxis
+                          dataKey="date"
                           stroke="#333333"
                           style={{ fontSize: '11px', fontFamily: 'Inter' }}
                           angle={-45}
                           textAnchor="end"
                           height={80}
                         />
-                        <YAxis 
+                        <YAxis
                           stroke="#333333"
                           style={{ fontSize: '12px', fontFamily: 'Inter' }}
                         />
-                        <Tooltip 
-                          contentStyle={{ 
+                        <Tooltip
+                          contentStyle={{
                             backgroundColor: '#F8F8F8',
                             border: '1px solid #E0B74F',
                             borderRadius: '8px',
@@ -273,13 +309,13 @@ export default function Dashboard() {
                             return [value, name];
                           }}
                         />
-                        <Area 
-                          type="monotone" 
-                          dataKey="count" 
-                          stroke="#2ECC71" 
+                        <Area
+                          type="monotone"
+                          dataKey="count"
+                          stroke="#2ECC71"
                           strokeWidth={3}
-                          fillOpacity={1} 
-                          fill="url(#colorUsers)" 
+                          fillOpacity={1}
+                          fill="url(#colorUsers)"
                         />
                       </AreaChart>
                     </ResponsiveContainer>
