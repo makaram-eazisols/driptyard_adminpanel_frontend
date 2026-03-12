@@ -301,6 +301,11 @@ class ApiClient {
     return response.data;
   }
 
+  async getEasyparcelShipments() {
+    const response = await this.client.get("/api/v1/easyparcel/admin/shipments");
+    return response.data;
+  }
+
   async releasePayout(orderId) {
     const response = await this.client.post(`/orders/${orderId}/release-payout`);
     return response.data;

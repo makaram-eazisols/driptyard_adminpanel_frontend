@@ -13,6 +13,7 @@ import {
   Shield,
   FileText,
   ShoppingCart,
+  Truck,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { cn } from "@/lib/utils";
@@ -82,6 +83,11 @@ const buildMenuItems = (user) => {
   // Orders - typically admin only
   if (isAdmin || user?.role === "admin") {
     items.push({ title: "Orders", url: "/admin/orders", icon: ShoppingCart });
+  }
+
+  // Easyparcel order details (admin only) — real-time from EasyParcel API
+  if (isAdmin || user?.role === "admin") {
+    items.push({ title: "Easyparcel Orders", url: "/admin/easyparcel-orders", icon: Truck });
   }
 
   // Logs & Audit Trails - typically admin only
