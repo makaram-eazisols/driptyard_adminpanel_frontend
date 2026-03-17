@@ -78,6 +78,7 @@ const buildMenuItems = (user) => {
 
   if (can("can_see_flagged_content")) {
     items.push({ title: "Flagged Content", url: "/admin/flagged", icon: Flag });
+    items.push({ title: "Reports", url: "/admin/reports", icon: FileText });
   }
 
   // Orders - typically admin only

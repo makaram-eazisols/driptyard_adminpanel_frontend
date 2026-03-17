@@ -1,0 +1,329 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { AdminLayout } from "@/components/admin/AdminLayout";
+import { Card, CardContent } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Loader2, Search, Filter, MoreVertical, CheckCircle, XCircle, RefreshCw } from "lucide-react";
+import { apiClient } from "@/lib/api-client";
+import { notifyError, notifySuccess } from "@/lib/toast";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+const TYPE_OPTIONS = [
+  { label: "All types", value: "all" },
+  { label: "Product", value: "product" },
+  { label: "Order", value: "order" },
+  { label: "General", value: "general" },
+  { label: "User", value: "user" },
+  { label: "Conversation", value: "conversation" },
+];
+
+function Reports() {
+  const [loading, setLoading] = useState(true);
+  const [allReports, setAllReports] = useState([]);
+  const [filteredReports, setFilteredReports] = useState([]);
+  const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [actionLoading, setActionLoading] = useState({});
+  const [statusOptions, setStatusOptions] = useState([]);
+
+  const fetchReports = async () => {
+    setLoading(true);
+    try {
+      const data = await apiClient.getAdminAllReports();
+
+      const flatten = [];
+
+      (data.product_reports || []).forEach((r) =>
+        flatten.push({
+          id: `product-${r.id}`,
+          rawId: r.id,
+          type: "product",
+          status: r.status,
+          reason: r.reason,
+          created_at: r.created_at,
+          reporter_id: r.reporter_id,
+          reporter_email: r.reporter_email,
+          target: r.product_id ? `Product #${r.product_id}` : "Product",
+        }),
+      );
+
+      (data.order_reports || []).forEach((r) =>
+        flatten.push({
+          id: `order-${r.id}`,
+          rawId: r.id,
+          type: "order",
+          status: r.status,
+          reason: r.reason,
+          created_at: r.created_at,
+          reporter_id: r.reporter_id,
+          target: r.order_id ? `Order #${r.order_id}` : "Order",
+        }),
+      );
+
+      (data.general_reports || []).forEach((r) =>
+        flatten.push({
+          id: `general-${r.id}`,
+          rawId: r.id,
+          type: "general",
+          status: r.status,
+          reason: r.reason,
+          created_at: r.created_at,
+          reporter_id: r.reporter_id,
+          target: r.target_type && r.target_id ? `${r.target_type} #${r.target_id}` : r.target_type || "General",
+        }),
+      );
+
+      (data.user_reports || []).forEach((r) =>
+        flatten.push({
+          id: `user-${r.id}`,
+          rawId: r.id,
+          type: "user",
+          status: r.status,
+          reason: r.reason,
+          created_at: r.created_at,
+          reporter_id: r.reporter_id,
+          target: r.reported_user_id ? `User #${r.reported_user_id}` : "User",
+        }),
+      );
+
+      (data.conversation_reports || []).forEach((r) =>
+        flatten.push({
+          id: `conversation-${r.id}`,
+          rawId: r.id,
+          type: "conversation",
+          status: r.status,
+          reason: r.reason,
+          created_at: r.created_at,
+          reporter_id: r.reporter_id,
+          target: r.conversation_id ? `Conversation #${r.conversation_id}` : "Conversation",
+        }),
+      );
+
+      // Sort newest first
+      flatten.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+
+      setAllReports(flatten);
+      setFilteredReports(flatten);
+    } catch (error) {
+      console.error("Failed to fetch all reports:", error);
+      notifyError(error.response?.data?.detail || error.message || "Failed to fetch reports");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const run = async () => {
+      setLoading(true);
+      try {
+        const statuses = await apiClient.getReportStatuses();
+        setStatusOptions(statuses || []);
+      } catch (error) {
+        console.error("Failed to load report statuses:", error);
+        notifyError(error.response?.data?.detail || error.message || "Failed to load report statuses");
+      }
+      await fetchReports();
+    };
+    run();
+  }, []);
+
+  useEffect(() => {
+    let next = [...allReports];
+
+    if (typeFilter !== "all") {
+      next = next.filter((r) => r.type === typeFilter);
+    }
+
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      next = next.filter((r) => {
+        return (
+          (r.reason || "").toLowerCase().includes(q) ||
+          (r.status || "").toLowerCase().includes(q) ||
+          (r.target || "").toLowerCase().includes(q) ||
+          String(r.reporter_id || "").toLowerCase().includes(q) ||
+          String(r.reporter_email || "").toLowerCase().includes(q)
+        );
+      });
+    }
+
+    setFilteredReports(next);
+  }, [allReports, search, typeFilter]);
+
+  const formatDateTime = (value) => {
+    if (!value) return "—";
+    try {
+      return new Date(value).toLocaleString();
+    } catch {
+      return String(value);
+    }
+  };
+
+  const statusVariant = (status) => {
+    const s = (status || "").toLowerCase();
+    if (s === "approved" || s === "resolved" || s === "completed") return "success";
+    if (s === "rejected") return "destructive";
+    if (s === "pending" || s === "processing") return "outline";
+    return "secondary";
+  };
+
+  const handleStatusChange = async (report, statusName) => {
+    const key = `status-${report.id}-${statusName}`;
+    setActionLoading((prev) => ({ ...prev, [key]: true }));
+    try {
+      await apiClient.updateReportStatus(report.type, report.rawId, statusName);
+      notifySuccess(`Status updated to '${statusName}'.`);
+      await fetchReports();
+    } catch (error) {
+      notifyError(error.response?.data?.detail || error.message || "Failed to update status");
+    } finally {
+      setActionLoading((prev) => ({ ...prev, [key]: false }));
+    }
+  };
+
+  return (
+    <AdminLayout>
+      <div className="space-y-6">
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-secondary">All Reports</h1>
+            <p className="text-muted-foreground">
+              View every report across the platform (products, orders, users, general issues, conversations).
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search reports..."
+                className="pl-9 w-64"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <Select value={typeFilter} onValueChange={setTypeFilter}>
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="All types" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TYPE_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+
+        <Card>
+          <CardContent className="p-6">
+            {loading ? (
+              <div className="flex flex-col items-center justify-center py-16 gap-2">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">Loading reports...</p>
+              </div>
+            ) : filteredReports.length === 0 ? (
+              <div className="text-center py-16 text-muted-foreground text-sm">No reports found.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Target</TableHead>
+                      <TableHead>Reporter</TableHead>
+                      <TableHead>Reason</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Created at</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredReports.map((r) => (
+                      <TableRow key={r.id}>
+                        <TableCell className="capitalize">{r.type}</TableCell>
+                        <TableCell>{r.target || "—"}</TableCell>
+                        <TableCell>
+                          <div className="flex flex-col text-xs">
+                            {r.reporter_id && <span>ID: {r.reporter_id}</span>}
+                            {r.reporter_email && <span>{r.reporter_email}</span>}
+                          </div>
+                        </TableCell>
+                        <TableCell className="max-w-xs">
+                          <span className="text-sm break-words">{r.reason || "—"}</span>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={statusVariant(r.status)} className="capitalize">
+                            {r.status || "N/A"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{formatDateTime(r.created_at)}</TableCell>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              {statusOptions.map((opt) => {
+                                const key = `status-${r.id}-${opt.status}`;
+                                const isActive =
+                                  (r.status || "").toLowerCase() === (opt.status || "").toLowerCase();
+                                return (
+                                  <DropdownMenuItem
+                                    key={opt.id}
+                                    className="cursor-pointer flex items-center gap-2"
+                                    disabled={actionLoading[key]}
+                                    onClick={() => handleStatusChange(r, opt.status)}
+                                  >
+                                    {actionLoading[key] ? (
+                                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                    ) : isActive ? (
+                                      <CheckCircle className="h-4 w-4 mr-1 text-green-600" />
+                                    ) : (
+                                      <span className="h-2 w-2 rounded-full bg-muted-foreground mr-2" />
+                                    )}
+                                    <span className="capitalize">{opt.status}</span>
+                                  </DropdownMenuItem>
+                                );
+                              })}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </AdminLayout>
+  );
+}
+
+export default function ReportsPage() {
+  return (
+    <ProtectedRoute>
+      <Reports />
+    </ProtectedRoute>
+  );
+}
+

@@ -399,6 +399,16 @@ class ApiClient {
     return response.data;
   }
 
+  async getAdminAllReports() {
+    const response = await this.client.get("/admin/reports/all");
+    return response.data;
+  }
+
+  async getReportStatuses() {
+    const response = await this.client.get("/admin/report-statuses");
+    return response.data;
+  }
+
   async rejectReport(reportId) {
     const response = await this.client.post(`/admin/reports/${reportId}/reject`);
     return response.data;
@@ -411,6 +421,13 @@ class ApiClient {
 
   async reviewReport(reportId) {
     const response = await this.client.post(`/admin/reports/${reportId}/review`);
+    return response.data;
+  }
+
+  async updateReportStatus(reportType, reportId, status) {
+    const response = await this.client.post(`/admin/reports/${reportType}/${reportId}/status`, {
+      status,
+    });
     return response.data;
   }
 
