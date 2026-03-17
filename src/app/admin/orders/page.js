@@ -171,8 +171,13 @@ function Orders() {
   };
 
   const productUrl = (productId) => {
-    const base = process.env.NEXT_PUBLIC_FRONTEND_URL || (typeof window !== "undefined" ? window.location.origin : "");
-    return `${base}/products/${productId}`;
+    const websiteUrl = process.env.NEXT_PUBLIC_WEBSITE_URL || "https://driptyard.vercel.app";
+    // Ensure proper URL construction with /products/ path
+    let baseUrl = websiteUrl.endsWith("/") ? websiteUrl.slice(0, -1) : websiteUrl;
+    if (!baseUrl.endsWith("/products")) {
+      baseUrl = `${baseUrl}/products`;
+    }
+    return productId ? `${baseUrl}/${productId}` : null;
   };
 
   const orderDetailFields = (order) => {
