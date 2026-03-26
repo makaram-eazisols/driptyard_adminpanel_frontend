@@ -1,7 +1,7 @@
 import axios from "axios";
 
 // Configure your backend URL
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://d1q0u57nt27d02.cloudfront.net";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://d2y85s88dwi81o.cloudfront.net";
 
 class ApiClient {
   constructor() {
