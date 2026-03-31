@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Loader2, Search, Filter, MoreVertical, CheckCircle, XCircle, RefreshCw } from "lucide-react";
+import { Loader2, Search, Filter, MoreVertical, CheckCircle, Eye } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import { notifyError, notifySuccess } from "@/lib/toast";
 import {
@@ -18,6 +18,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const TYPE_OPTIONS = [
   { label: "All types", value: "all" },
@@ -36,6 +37,11 @@ function Reports() {
   const [typeFilter, setTypeFilter] = useState("all");
   const [actionLoading, setActionLoading] = useState({});
   const [statusOptions, setStatusOptions] = useState([]);
+  const [isConversationDialogOpen, setIsConversationDialogOpen] = useState(false);
+  const [conversationLoading, setConversationLoading] = useState(false);
+  const [selectedConversationId, setSelectedConversationId] = useState(null);
+  const [selectedConversationMeta, setSelectedConversationMeta] = useState(null);
+  const [conversationMessages, setConversationMessages] = useState([]);
 
   const fetchReports = async () => {
     setLoading(true);
@@ -106,6 +112,7 @@ function Reports() {
           reason: r.reason,
           created_at: r.created_at,
           reporter_id: r.reporter_id,
+          conversation_id: r.conversation_id,
           target: r.conversation_id ? `Conversation #${r.conversation_id}` : "Conversation",
         }),
       );
@@ -189,6 +196,63 @@ function Reports() {
       notifyError(error.response?.data?.detail || error.message || "Failed to update status");
     } finally {
       setActionLoading((prev) => ({ ...prev, [key]: false }));
+    }
+  };
+
+  const getConversationMeta = async (conversationId) => {
+    try {
+      const response = await apiClient.getAdminConversations({
+        page: 1,
+        page_size: 100,
+        is_reported: true,
+      });
+      const conversations = response?.conversations || [];
+      return conversations.find((conv) => Number(conv.id) === Number(conversationId)) || null;
+    } catch {
+      return null;
+    }
+  };
+
+  const openConversationModal = async (report) => {
+    const conversationId = report?.conversation_id;
+    if (!conversationId) {
+      notifyError("Conversation ID is missing for this report.");
+      return;
+    }
+
+    setSelectedConversationId(conversationId);
+    setIsConversationDialogOpen(true);
+    setConversationLoading(true);
+    setConversationMessages([]);
+    setSelectedConversationMeta(null);
+
+    try {
+      const [messages, meta] = await Promise.all([
+        apiClient.getAdminConversationMessages(conversationId),
+        getConversationMeta(conversationId),
+      ]);
+      setConversationMessages(Array.isArray(messages) ? messages : []);
+      setSelectedConversationMeta(meta);
+    } catch (error) {
+      notifyError(error.response?.data?.detail || error.message || "Failed to load conversation");
+    } finally {
+      setConversationLoading(false);
+    }
+  };
+
+  const getParticipantRole = (senderId) => {
+    if (!selectedConversationMeta) return "Participant";
+    if (Number(senderId) === Number(selectedConversationMeta.seller_id)) return "Seller";
+    if (Number(senderId) === Number(selectedConversationMeta.buyer_id)) return "Buyer";
+    return "Participant";
+  };
+
+  const formatMessageTime = (value) => {
+    if (!value) return "";
+    try {
+      return new Date(value).toLocaleString();
+    } catch {
+      return String(value);
     }
   };
 
@@ -281,6 +345,15 @@ function Reports() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
+                              {r.type === "conversation" && (
+                                <DropdownMenuItem
+                                  className="cursor-pointer flex items-center gap-2"
+                                  onClick={() => openConversationModal(r)}
+                                >
+                                  <Eye className="h-4 w-4 mr-1" />
+                                  <span>View Conversation</span>
+                                </DropdownMenuItem>
+                              )}
                               {statusOptions.map((opt) => {
                                 const key = `status-${r.id}-${opt.status}`;
                                 const isActive =
@@ -315,6 +388,62 @@ function Reports() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog
+        open={isConversationDialogOpen}
+        onOpenChange={(open) => {
+          setIsConversationDialogOpen(open);
+          if (!open) {
+            setConversationMessages([]);
+            setSelectedConversationMeta(null);
+            setSelectedConversationId(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>
+              Conversation #{selectedConversationId || ""}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="h-[60vh] overflow-y-auto rounded-md border border-border bg-muted/20 p-4 space-y-3">
+            {conversationLoading ? (
+              <div className="flex h-full items-center justify-center gap-2 text-muted-foreground">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                <span className="text-sm">Loading conversation...</span>
+              </div>
+            ) : conversationMessages.length === 0 ? (
+              <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                No messages found.
+              </div>
+            ) : (
+              conversationMessages.map((msg) => {
+                const role = getParticipantRole(msg.sender_id);
+                const isSeller = role === "Seller";
+                const isBuyer = role === "Buyer";
+                const bubbleClass = isSeller
+                  ? "bg-blue-100 text-blue-900 border-blue-200"
+                  : isBuyer
+                    ? "bg-green-100 text-green-900 border-green-200"
+                    : "bg-background text-foreground border-border";
+                const alignClass = isSeller ? "justify-end" : "justify-start";
+
+                return (
+                  <div key={msg.id} className={`flex ${alignClass}`}>
+                    <div className={`max-w-[80%] rounded-xl border px-3 py-2 ${bubbleClass}`}>
+                      <div className="mb-1 flex items-center justify-between gap-3 text-[11px] font-medium uppercase tracking-wide opacity-80">
+                        <span>{role}</span>
+                        <span className="normal-case tracking-normal">{formatMessageTime(msg.created_at)}</span>
+                      </div>
+                      <p className="text-sm whitespace-pre-wrap break-words">{msg.content || "—"}</p>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
   );
 }

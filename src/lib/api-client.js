@@ -404,6 +404,16 @@ class ApiClient {
     return response.data;
   }
 
+  async getAdminConversations(params) {
+    const response = await this.client.get("/admin/conversations", { params });
+    return response.data;
+  }
+
+  async getAdminConversationMessages(conversationId) {
+    const response = await this.client.get(`/admin/conversations/${conversationId}/messages`);
+    return response.data;
+  }
+
   async getReportStatuses() {
     const response = await this.client.get("/admin/report-statuses");
     return response.data;
