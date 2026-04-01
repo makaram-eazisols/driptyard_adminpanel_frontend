@@ -41,6 +41,7 @@ function Reports() {
   const [conversationLoading, setConversationLoading] = useState(false);
   const [selectedConversationId, setSelectedConversationId] = useState(null);
   const [selectedConversationMeta, setSelectedConversationMeta] = useState(null);
+  const [selectedConversationProductName, setSelectedConversationProductName] = useState("");
   const [conversationMessages, setConversationMessages] = useState([]);
 
   const fetchReports = async () => {
@@ -201,13 +202,24 @@ function Reports() {
 
   const getConversationMeta = async (conversationId) => {
     try {
-      const response = await apiClient.getAdminConversations({
-        page: 1,
-        page_size: 100,
-        is_reported: true,
-      });
-      const conversations = response?.conversations || [];
-      return conversations.find((conv) => Number(conv.id) === Number(conversationId)) || null;
+      let page = 1;
+      let totalPages = 1;
+
+      while (page <= totalPages) {
+        const response = await apiClient.getAdminConversations({
+          page,
+          page_size: 100,
+        });
+        const conversations = response?.conversations || [];
+        const found = conversations.find((conv) => Number(conv.id) === Number(conversationId));
+        if (found) return found;
+
+        const total = Number(response?.total || 0);
+        totalPages = Math.max(1, Math.ceil(total / 100));
+        page += 1;
+      }
+
+      return null;
     } catch {
       return null;
     }
@@ -225,6 +237,7 @@ function Reports() {
     setConversationLoading(true);
     setConversationMessages([]);
     setSelectedConversationMeta(null);
+    setSelectedConversationProductName("");
 
     try {
       const [messages, meta] = await Promise.all([
@@ -233,6 +246,18 @@ function Reports() {
       ]);
       setConversationMessages(Array.isArray(messages) ? messages : []);
       setSelectedConversationMeta(meta);
+
+      const productId = meta?.product_id;
+      if (productId) {
+        try {
+          const product = await apiClient.getProduct(productId);
+          const productName =
+            product?.title || product?.name || product?.product_title || product?.product_name || "";
+          setSelectedConversationProductName(productName);
+        } catch {
+          setSelectedConversationProductName("");
+        }
+      }
     } catch (error) {
       notifyError(error.response?.data?.detail || error.message || "Failed to load conversation");
     } finally {
@@ -256,6 +281,22 @@ function Reports() {
     }
   };
 
+  const getConversationProductName = () => {
+    if (selectedConversationProductName) return selectedConversationProductName;
+    const meta = selectedConversationMeta;
+    if (!meta) return "";
+    return (
+      meta.product_name ||
+      meta.product_title ||
+      meta.productName ||
+      meta.title ||
+      meta?.product?.name ||
+      meta?.product?.title ||
+      ""
+    );
+  };
+
+  console.log("Testing.....", getConversationProductName());
   return (
     <AdminLayout>
       <div className="space-y-6">
@@ -397,13 +438,14 @@ function Reports() {
             setConversationMessages([]);
             setSelectedConversationMeta(null);
             setSelectedConversationId(null);
+            setSelectedConversationProductName("");
           }
         }}
       >
         <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>
-              Conversation #{selectedConversationId || ""}
+              {getConversationProductName() || `Conversation #${selectedConversationId || ""}`}
             </DialogTitle>
           </DialogHeader>
           <div className="h-[60vh] overflow-y-auto rounded-md border border-border bg-muted/20 p-4 space-y-3">
