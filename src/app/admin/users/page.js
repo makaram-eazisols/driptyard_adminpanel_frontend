@@ -389,6 +389,31 @@ function Users() {
     return "Active";
   };
 
+  const getUserPlanMeta = (user) => {
+    const rawPlan = String(user?.membership_plan || "")
+      .trim()
+      .toLowerCase();
+
+    if (rawPlan === "business" || rawPlan === "business_premium" || rawPlan === "business premium") {
+      return {
+        label: "Business Premium",
+        className: "bg-purple-100 text-purple-700 border-purple-200",
+      };
+    }
+
+    if (rawPlan === "premium") {
+      return {
+        label: "Premium",
+        className: "bg-amber-100 text-amber-700 border-amber-200",
+      };
+    }
+
+    return {
+      label: "Basic",
+      className: "bg-slate-100 text-slate-700 border-slate-200",
+    };
+  };
+
   const handleUsernameDoubleClick = (user) => {
     handleViewUser(user);
   };
@@ -826,6 +851,7 @@ function Users() {
                       <TableHead className="h-12 px-4 font-semibold text-secondary">User Name</TableHead>
                       <TableHead className="h-12 px-4 font-semibold text-secondary">Email</TableHead>
                       <TableHead className="h-12 px-4 font-semibold text-secondary">Listings</TableHead>
+                      <TableHead className="h-12 px-4 font-semibold text-secondary">Plan</TableHead>
                       <TableHead className="h-12 px-4 font-semibold text-secondary">Status</TableHead>
                       <TableHead className="h-12 px-4 font-semibold text-secondary">Joined</TableHead>
                       {canManageUsers && (
@@ -834,8 +860,10 @@ function Users() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {users?.map((user) => (
-                      <TableRow key={user.id} className="hover:bg-muted/30 transition-colors">
+                    {users?.map((user) => {
+                      const planMeta = getUserPlanMeta(user);
+                      return (
+                      <TableRow key={user.id || user.user_id} className="hover:bg-muted/30 transition-colors">
                         {canManageUsers && (
                           <TableCell className="py-3 px-4">
                             <Checkbox
@@ -858,6 +886,11 @@ function Users() {
                         </TableCell>
                         <TableCell className="py-3 px-4">
                           <p className="text-sm text-foreground">{user.listings_count || 0}</p>
+                        </TableCell>
+                        <TableCell className="py-3 px-4">
+                          <Badge variant="outline" className={`text-xs font-medium ${planMeta.className}`}>
+                            {planMeta.label}
+                          </Badge>
                         </TableCell>
                         <TableCell className="py-3 px-4">
                           <Badge variant={getStatusBadgeVariant(user)} className="text-xs">{getStatusText(user)}</Badge>
@@ -958,7 +991,8 @@ function Users() {
                           </TableCell>
                         )}
                       </TableRow>
-                    ))}
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>

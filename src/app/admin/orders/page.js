@@ -32,6 +32,8 @@ import {
 } from "@/components/ui/dialog";
 import { apiClient } from "@/lib/api-client";
 import { notifySuccess, notifyError } from "@/lib/toast";
+import ConfirmActionDialog from "@/components/modals/ConfirmActionDialog";
+import TextPromptDialog from "@/components/modals/TextPromptDialog";
 
 const STATUS_OPTIONS = [
   { label: "All Statuses", value: "all" },
@@ -58,6 +60,24 @@ function Orders() {
   const [totalPages, setTotalPages] = useState(1);
   const [autoConfirming, setAutoConfirming] = useState(false);
   const [detailsOrder, setDetailsOrder] = useState(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState({
+    open: false,
+    title: "",
+    description: "",
+    confirmLabel: "Confirm",
+    confirmClassName: "",
+    onConfirm: null,
+  });
+  const [promptDialog, setPromptDialog] = useState({
+    open: false,
+    title: "",
+    description: "",
+    value: "",
+    placeholder: "",
+    submitLabel: "Submit",
+    onSubmit: null,
+  });
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
@@ -82,85 +102,145 @@ function Orders() {
     fetchOrders();
   }, [fetchOrders]);
 
-  const handleReleasePayout = async (orderId) => {
-    if (confirm("Are you sure you want to release the payout for this order?")) {
-      try {
-        await apiClient.releasePayout(orderId);
-        notifySuccess("Payout released successfully");
-        fetchOrders();
-      } catch (error) {
-        notifyError(error.response?.data?.detail || "Failed to release payout");
-      }
-    }
+  const handleReleasePayout = (orderId) => {
+    setConfirmDialog({
+      open: true,
+      title: "Release payout?",
+      description: "Are you sure you want to release the payout for this order?",
+      confirmLabel: "Release Payout",
+      confirmClassName: "",
+      onConfirm: async () => {
+        setActionLoading(true);
+        try {
+          await apiClient.releasePayout(orderId);
+          notifySuccess("Payout released successfully");
+          fetchOrders();
+          setConfirmDialog((prev) => ({ ...prev, open: false }));
+        } catch (error) {
+          notifyError(error.response?.data?.detail || "Failed to release payout");
+        } finally {
+          setActionLoading(false);
+        }
+      },
+    });
   };
 
-  const handleMarkPaidOut = async (orderId) => {
-    if (confirm("Mark this order as manually paid out?")) {
-      try {
-        await apiClient.markPaidOut(orderId);
-        notifySuccess("Order marked as PAID_OUT");
-        fetchOrders();
-      } catch (error) {
-        notifyError(error.response?.data?.detail || "Failed to mark as paid out");
-      }
-    }
+  const handleMarkPaidOut = (orderId) => {
+    setConfirmDialog({
+      open: true,
+      title: "Mark order paid out?",
+      description: "Mark this order as manually paid out?",
+      confirmLabel: "Mark Paid Out",
+      confirmClassName: "",
+      onConfirm: async () => {
+        setActionLoading(true);
+        try {
+          await apiClient.markPaidOut(orderId);
+          notifySuccess("Order marked as PAID_OUT");
+          fetchOrders();
+          setConfirmDialog((prev) => ({ ...prev, open: false }));
+        } catch (error) {
+          notifyError(error.response?.data?.detail || "Failed to mark as paid out");
+        } finally {
+          setActionLoading(false);
+        }
+      },
+    });
   };
 
-  const handleApproveRefund = async (orderId) => {
-    if (confirm("Approve this refund request? (Record only; process refund manually.)")) {
-      try {
-        await apiClient.approveRefund(orderId);
-        notifySuccess("Refund approved");
-        fetchOrders();
-        return true;
-      } catch (error) {
-        notifyError(error.response?.data?.detail || "Failed to approve refund");
-      }
-    }
-    return false;
+  const handleApproveRefund = (orderId) => {
+    setConfirmDialog({
+      open: true,
+      title: "Approve refund request?",
+      description: "This is record-only. Process the actual refund manually.",
+      confirmLabel: "Approve Refund",
+      confirmClassName: "bg-green-600 text-white hover:bg-green-700",
+      onConfirm: async () => {
+        setActionLoading(true);
+        try {
+          await apiClient.approveRefund(orderId);
+          notifySuccess("Refund approved");
+          fetchOrders();
+          setConfirmDialog((prev) => ({ ...prev, open: false }));
+        } catch (error) {
+          notifyError(error.response?.data?.detail || "Failed to approve refund");
+        } finally {
+          setActionLoading(false);
+        }
+      },
+    });
   };
 
-  const handleRejectRefund = async (orderId) => {
-    const note = window.prompt("Reject refund request. Optional note for the record:");
-    if (note === null) return false; // user cancelled
-    try {
-      await apiClient.rejectRefund(orderId, { notes: note || undefined });
-      notifySuccess("Refund rejected");
-      fetchOrders();
-      return true;
-    } catch (error) {
-      notifyError(error.response?.data?.detail || "Failed to reject refund");
-      return false;
-    }
+  const handleRejectRefund = (orderId) => {
+    setPromptDialog({
+      open: true,
+      title: "Reject refund request",
+      description: "Add an optional note for the record.",
+      value: "",
+      placeholder: "Optional note...",
+      submitLabel: "Reject Refund",
+      onSubmit: async (note) => {
+        setActionLoading(true);
+        try {
+          await apiClient.rejectRefund(orderId, { notes: note || undefined });
+          notifySuccess("Refund rejected");
+          fetchOrders();
+          setPromptDialog((prev) => ({ ...prev, open: false }));
+        } catch (error) {
+          notifyError(error.response?.data?.detail || "Failed to reject refund");
+        } finally {
+          setActionLoading(false);
+        }
+      },
+    });
   };
 
-  const handleMarkRefundPaid = async (orderId) => {
-    if (confirm("Record that the refund has been paid to the buyer?")) {
-      try {
-        await apiClient.markRefundPaid(orderId);
-        notifySuccess("Refund marked as paid");
-        fetchOrders();
-        return true;
-      } catch (error) {
-        notifyError(error.response?.data?.detail || "Failed to mark refund as paid");
-      }
-    }
-    return false;
+  const handleMarkRefundPaid = (orderId) => {
+    setConfirmDialog({
+      open: true,
+      title: "Mark refund paid?",
+      description: "Record that the refund has been paid to the buyer?",
+      confirmLabel: "Mark Refund Paid",
+      confirmClassName: "",
+      onConfirm: async () => {
+        setActionLoading(true);
+        try {
+          await apiClient.markRefundPaid(orderId);
+          notifySuccess("Refund marked as paid");
+          fetchOrders();
+          setConfirmDialog((prev) => ({ ...prev, open: false }));
+        } catch (error) {
+          notifyError(error.response?.data?.detail || "Failed to mark refund as paid");
+        } finally {
+          setActionLoading(false);
+        }
+      },
+    });
   };
 
-  const handleAutoConfirmReceipts = async () => {
-    if (confirm("Auto-confirm receipts for orders past delivery date (1 day)?")) {
-      setAutoConfirming(true);
-      try {
-        const result = await apiClient.autoConfirmReceipts(1);
-        notifySuccess(result.message || `Auto-confirmed ${result.count || 0} order(s)`);
-        fetchOrders();
-      } catch (error) {
-        notifyError(error.response?.data?.detail || "Failed to auto-confirm receipts");
-      } finally {
-        setAutoConfirming(false);
-      }
-    }
+  const handleAutoConfirmReceipts = () => {
+    setConfirmDialog({
+      open: true,
+      title: "Auto-confirm receipts?",
+      description: "Auto-confirm receipts for orders past delivery date (1 day)?",
+      confirmLabel: "Run Auto-Confirm",
+      confirmClassName: "",
+      onConfirm: async () => {
+        setActionLoading(true);
+        setAutoConfirming(true);
+        try {
+          const result = await apiClient.autoConfirmReceipts(1);
+          notifySuccess(result.message || `Auto-confirmed ${result.count || 0} order(s)`);
+          fetchOrders();
+          setConfirmDialog((prev) => ({ ...prev, open: false }));
+        } catch (error) {
+          notifyError(error.response?.data?.detail || "Failed to auto-confirm receipts");
+        } finally {
+          setActionLoading(false);
+          setAutoConfirming(false);
+        }
+      },
+    });
   };
 
   const formatCurrency = (amount) => {
@@ -506,7 +586,10 @@ function Orders() {
                       size="sm"
                       variant="outline"
                       className="text-green-600 border-green-600 hover:bg-green-50"
-                      onClick={() => handleApproveRefund(detailsOrder.id).then((ok) => ok && setDetailsOrder(null))}
+                      onClick={() => {
+                        handleApproveRefund(detailsOrder.id);
+                        setDetailsOrder(null);
+                      }}
                     >
                       Approve Refund
                     </Button>
@@ -514,7 +597,10 @@ function Orders() {
                       size="sm"
                       variant="outline"
                       className="text-destructive border-destructive hover:bg-destructive/10"
-                      onClick={() => handleRejectRefund(detailsOrder.id).then((ok) => ok && setDetailsOrder(null))}
+                      onClick={() => {
+                        handleRejectRefund(detailsOrder.id);
+                        setDetailsOrder(null);
+                      }}
                     >
                       Reject Refund
                     </Button>
@@ -524,7 +610,10 @@ function Orders() {
                   <Button
                     size="sm"
                     className="bg-accent text-accent-foreground"
-                    onClick={() => handleMarkRefundPaid(detailsOrder.id).then((ok) => ok && setDetailsOrder(null))}
+                    onClick={() => {
+                      handleMarkRefundPaid(detailsOrder.id);
+                      setDetailsOrder(null);
+                    }}
                   >
                     Mark Refund Paid
                   </Button>
@@ -533,6 +622,35 @@ function Orders() {
             )}
           </DialogContent>
         </Dialog>
+        <ConfirmActionDialog
+          open={confirmDialog.open}
+          onOpenChange={(open) => {
+            if (!open && !actionLoading) {
+              setConfirmDialog((prev) => ({ ...prev, open: false }));
+            }
+          }}
+          title={confirmDialog.title}
+          description={confirmDialog.description}
+          confirmLabel={confirmDialog.confirmLabel}
+          confirmClassName={confirmDialog.confirmClassName}
+          onConfirm={confirmDialog.onConfirm}
+          isLoading={actionLoading}
+        />
+        <TextPromptDialog
+          open={promptDialog.open}
+          onOpenChange={(open) => {
+            if (!open && !actionLoading) {
+              setPromptDialog((prev) => ({ ...prev, open: false }));
+            }
+          }}
+          title={promptDialog.title}
+          description={promptDialog.description}
+          value={promptDialog.value}
+          placeholder={promptDialog.placeholder}
+          submitLabel={promptDialog.submitLabel}
+          onChange={promptDialog.onSubmit}
+          isLoading={actionLoading}
+        />
       </div>
     </AdminLayout>
   );
