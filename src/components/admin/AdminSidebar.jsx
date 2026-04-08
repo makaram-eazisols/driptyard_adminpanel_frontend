@@ -92,10 +92,6 @@ const buildMenuItems = (user) => {
     items.push({ title: "Easyparcel Orders", url: "/admin/easyparcel-orders", icon: Truck });
   }
 
-  if (isAdmin || user?.role === "admin") {
-    items.push({ title: "Credentials", url: "/admin/credentials", icon: KeyRound });
-  }
-
   // Logs & Audit Trails - typically admin only
   if (isAdmin || user?.role === "admin") {
     items.push({ title: "Logs & Audit Trails", url: "/admin/logs", icon: FileText });
