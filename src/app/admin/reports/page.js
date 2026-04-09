@@ -281,6 +281,16 @@ function Reports() {
     }
   };
 
+  const getOfferStatusLabel = (status) => {
+    const normalized = String(status || "").toLowerCase();
+    if (!normalized) return null;
+    if (normalized === "accepted") return "Offer accepted";
+    if (normalized === "rejected") return "Offer declined";
+    if (normalized === "withdraw" || normalized === "withdrawn") return "Offer withdrawn";
+    if (normalized === "pending") return "Offer pending";
+    return `Offer ${normalized}`;
+  };
+
   const getConversationProductName = () => {
     if (selectedConversationProductName) return selectedConversationProductName;
     const meta = selectedConversationMeta;
@@ -396,6 +406,12 @@ function Reports() {
                                 </DropdownMenuItem>
                               )}
                               {statusOptions.map((opt) => {
+                                if (r.type === "conversation") {
+                                  const allowedConversationStatuses = new Set(["pending", "approved", "rejected"]);
+                                  if (!allowedConversationStatuses.has(String(opt.status || "").toLowerCase())) {
+                                    return null;
+                                  }
+                                }
                                 const key = `status-${r.id}-${opt.status}`;
                                 const isActive =
                                   (r.status || "").toLowerCase() === (opt.status || "").toLowerCase();
@@ -463,6 +479,8 @@ function Reports() {
                 const role = getParticipantRole(msg.sender_id);
                 const isSeller = role === "Seller";
                 const isBuyer = role === "Buyer";
+                const messageType = String(msg.message_type || "").toLowerCase();
+                const offerStatusLabel = getOfferStatusLabel(msg.offer_status);
                 const bubbleClass = isSeller
                   ? "bg-blue-100 text-blue-900 border-blue-200"
                   : isBuyer
@@ -476,6 +494,16 @@ function Reports() {
                       <div className="mb-1 flex items-center justify-between gap-3 text-[11px] font-medium uppercase tracking-wide opacity-80">
                         <span>{role}</span>
                         <span className="normal-case tracking-normal">{formatMessageTime(msg.created_at)}</span>
+                      </div>
+                      <div className="mb-1 flex items-center gap-2">
+                        <Badge variant="outline" className="text-[10px] capitalize">
+                          {messageType || "text"}
+                        </Badge>
+                        {offerStatusLabel && (
+                          <Badge variant="outline" className="text-[10px]">
+                            {offerStatusLabel}
+                          </Badge>
+                        )}
                       </div>
                       <p className="text-sm whitespace-pre-wrap break-words">{msg.content || "—"}</p>
                     </div>
