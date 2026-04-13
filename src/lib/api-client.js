@@ -441,6 +441,21 @@ class ApiClient {
     return response.data;
   }
 
+  async getUserReportConversation(reportId) {
+    const response = await this.client.get(`/admin/reports/user/${reportId}/conversation`);
+    return response.data;
+  }
+
+  async getOrderReportConversation(reportId) {
+    const response = await this.client.get(`/admin/reports/order/${reportId}/conversation`);
+    return response.data;
+  }
+
+  async getProductReportConversation(reportId) {
+    const response = await this.client.get(`/admin/reports/product/${reportId}/conversation`);
+    return response.data;
+  }
+
   // ============ ADMIN LOGS ENDPOINTS ============
   async getAdminLogs(params) {
     const response = await this.client.get("/admin/logs", { params });
