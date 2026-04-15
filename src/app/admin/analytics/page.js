@@ -55,11 +55,11 @@ function Analytics() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">$284,567</div>
+              <div className="text-2xl font-bold">S$284,567</div>
               <p className="text-xs text-muted-foreground">+20.1% from last month</p>
               <div className="flex gap-2 mt-3">
                 <Badge variant="outline">2,350 Orders</Badge>
-                <Badge className="bg-green-500">$28,456 Commission</Badge>
+                <Badge className="bg-green-500">S$28,456 Commission</Badge>
               </div>
             </CardContent>
           </Card>

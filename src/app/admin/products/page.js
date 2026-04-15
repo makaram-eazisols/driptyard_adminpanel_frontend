@@ -642,7 +642,7 @@ function Products() {
   const formatPrice = (value) => {
     const numeric = Number(value);
     if (Number.isNaN(numeric)) return "—";
-    return `$${numeric.toFixed(2)}`;
+    return `S$${numeric.toFixed(2)}`;
   };
 
   const getSelectedSellerDisplay = () => {

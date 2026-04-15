@@ -244,9 +244,9 @@ function Orders() {
   };
 
   const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat('en-SG', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'SGD',
     }).format(amount || 0);
   };
 

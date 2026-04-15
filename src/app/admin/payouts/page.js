@@ -15,7 +15,7 @@ const mockPayoutRequests = [
   {
     id: "1",
     seller: "john.doe@example.com",
-    amount: "$1,250.00",
+    amount: "S$1,250.00",
     method: "Bank Transfer",
     accountDetails: "****1234",
     requestedDate: "2024-01-15",
@@ -26,7 +26,7 @@ const mockPayoutRequests = [
   {
     id: "2",
     seller: "jane.smith@example.com",
-    amount: "$890.50",
+    amount: "S$890.50",
     method: "PayPal",
     accountDetails: "jane****@example.com",
     requestedDate: "2024-01-14",
@@ -37,7 +37,7 @@ const mockPayoutRequests = [
   {
     id: "3",
     seller: "sneaker.king@example.com",
-    amount: "$2,100.00",
+    amount: "S$2,100.00",
     method: "Bank Transfer",
     accountDetails: "****5678",
     requestedDate: "2024-01-13",
