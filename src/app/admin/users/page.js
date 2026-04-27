@@ -382,9 +382,9 @@ function Users() {
   };
 
   const getStatusText = (user) => {
-    if (user.is_banned) return "Inactive";
+    if (user.is_banned) return "Suspended";
     if (user.is_suspended) return "Suspended";
-    if (!user.is_active) return "Inactive";
+    if (!user.is_active) return "Suspended";
     if (!user.is_verified) return "Unverified";
     return "Active";
   };
