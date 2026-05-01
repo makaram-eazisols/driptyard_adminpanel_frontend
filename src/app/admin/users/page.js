@@ -162,7 +162,7 @@ function Users() {
     setPermissionsForm(null);
 
     // Load permissions if user is a moderator
-    if (user.is_moderator || user.role === "moderator") {
+    if (Boolean(user.is_moderator)) {
       setPermissionsLoading(true);
       try {
         const data = await apiClient.getModeratorPermissions(user.id || user.user_id);
@@ -1052,7 +1052,7 @@ function Users() {
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <TabsList className="grid w-full grid-cols-2">
                   <TabsTrigger value="user-edit">User Edit</TabsTrigger>
-                  <TabsTrigger value="permissions" disabled={!editUser.is_moderator && editUser.role !== "moderator"}>
+                  <TabsTrigger value="permissions" disabled={!Boolean(editUser.is_moderator)}>
                     Permissions
                   </TabsTrigger>
                 </TabsList>

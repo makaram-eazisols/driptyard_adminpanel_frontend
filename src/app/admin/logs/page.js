@@ -326,7 +326,20 @@ function Logs() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {logs.map((log, index) => (
+                    {logs.map((log, index) => {
+                      const normalizedRole = String(log.performer_role || "").toLowerCase();
+                      const roleLabel = normalizedRole === "admin"
+                        ? "Admin"
+                        : normalizedRole === "moderator"
+                          ? "Moderator"
+                          : normalizedRole === "user"
+                            ? "User"
+                            : log.is_admin
+                              ? "Admin"
+                              : "Moderator";
+                      const roleVariant = roleLabel === "Admin" ? "default" : "secondary";
+
+                      return (
                       <TableRow key={log.id || log.log_id || index} className="hover:bg-muted/50">
                         <TableCell className="px-4 py-3">
                           <div className="text-sm text-foreground">
@@ -338,12 +351,12 @@ function Logs() {
                             <div className="text-sm font-medium text-foreground">
                               {log.admin || log.admin_name || log.admin_username || log.user || "N/A"}
                             </div>
-                            {log.is_admin !== undefined && (
+                            {(log.performer_role !== undefined || log.is_admin !== undefined) && (
                               <Badge
-                                variant={log.is_admin ? "default" : "secondary"}
+                                variant={roleVariant}
                                 className="text-xs"
                               >
-                                {log.is_admin ? "Admin" : "Moderator"}
+                                {roleLabel}
                               </Badge>
                             )}
                           </div>
@@ -359,7 +372,7 @@ function Logs() {
                           </div>
                         </TableCell>
                       </TableRow>
-                    ))}
+                    )})}
                   </TableBody>
                 </Table>
               </div>
