@@ -79,6 +79,7 @@ function Reports() {
           type: "product",
           status: r.status,
           reason: r.reason,
+          description: r.description,
           created_at: r.created_at,
           reporter_id: r.reporter_id,
           reporter_email: r.reporter_email,
@@ -103,6 +104,7 @@ function Reports() {
           type: "order",
           status: r.status,
           reason: r.reason,
+          description: r.description,
           created_at: r.created_at,
           reporter_id: r.reporter_id,
           reporter_username: r.reporter_username,
@@ -130,6 +132,7 @@ function Reports() {
           type: "general",
           status: r.status,
           reason: r.reason,
+          description: r.description,
           created_at: r.created_at,
           reporter_id: r.reporter_id,
           target: r.target_type && r.target_id ? `${r.target_type} #${r.target_id}` : r.target_type || "General",
@@ -143,6 +146,7 @@ function Reports() {
           type: "user",
           status: r.status,
           reason: r.reason,
+          description: r.description,
           created_at: r.created_at,
           reporter_id: r.reporter_id,
           reporter_email: r.reporter_email,
@@ -165,6 +169,7 @@ function Reports() {
           type: "conversation",
           status: r.status,
           reason: r.reason,
+          description: r.description,
           created_at: r.created_at,
           reporter_id: r.reporter_id,
           conversation_id: r.conversation_id,
@@ -212,6 +217,7 @@ function Reports() {
       next = next.filter((r) => {
         return (
           (r.reason || "").toLowerCase().includes(q) ||
+          (r.description || "").toLowerCase().includes(q) ||
           (r.status || "").toLowerCase().includes(q) ||
           (r.target || "").toLowerCase().includes(q) ||
           String(r.reporter_id || "").toLowerCase().includes(q) ||
@@ -542,6 +548,7 @@ function Reports() {
                       <TableHead>Target</TableHead>
                       <TableHead>Reporter</TableHead>
                       <TableHead>Reason</TableHead>
+                      <TableHead>Description</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Created at</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
@@ -561,6 +568,9 @@ function Reports() {
                         </TableCell>
                         <TableCell className="max-w-xs">
                           <span className="text-sm break-words">{r.reason || "—"}</span>
+                        </TableCell>
+                        <TableCell className="max-w-xs">
+                          <span className="text-sm break-words">{r.description || "—"}</span>
                         </TableCell>
                         <TableCell>
                           <Badge variant={statusVariant(r.status)} className="capitalize">
