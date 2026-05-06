@@ -301,6 +301,11 @@ class ApiClient {
     return response.data;
   }
 
+  async getAdminTransactions(params) {
+    const response = await this.client.get("/transactions/admin", { params });
+    return response.data;
+  }
+
   async getEasyparcelShipments() {
     const response = await this.client.get("/api/v1/easyparcel/admin/shipments");
     return response.data;
@@ -378,6 +383,13 @@ class ApiClient {
 
   async unsuspendAdminUser(userId) {
     const response = await this.client.post(`/admin/users/${userId}/unsuspend`);
+    return response.data;
+  }
+
+  async updateBusinessVerificationStatus(userId, status) {
+    const response = await this.client.put(`/admin/users/${userId}/business-verification`, {
+      status,
+    });
     return response.data;
   }
 
@@ -459,6 +471,32 @@ class ApiClient {
   // ============ ADMIN LOGS ENDPOINTS ============
   async getAdminLogs(params) {
     const response = await this.client.get("/admin/logs", { params });
+    return response.data;
+  }
+
+  // ============ PROMO CODES ============
+  async getPromoCodes() {
+    const response = await this.client.get("/promo-codes");
+    return response.data;
+  }
+
+  async createPromoCode(data) {
+    const response = await this.client.post("/promo-codes", data);
+    return response.data;
+  }
+
+  async updatePromoCode(promoId, data) {
+    const response = await this.client.patch(`/promo-codes/${promoId}`, data);
+    return response.data;
+  }
+
+  async getPlatformFees() {
+    const response = await this.client.get("/fee-settings");
+    return response.data;
+  }
+
+  async updatePlatformFees(data) {
+    const response = await this.client.put("/fee-settings", data);
     return response.data;
   }
 

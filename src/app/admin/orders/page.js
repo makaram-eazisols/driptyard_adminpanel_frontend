@@ -78,6 +78,10 @@ function Orders() {
     submitLabel: "Submit",
     onSubmit: null,
   });
+  const [transactionsOpen, setTransactionsOpen] = useState(false);
+  const [transactionsLoading, setTransactionsLoading] = useState(false);
+  const [transactions, setTransactions] = useState([]);
+  const [transactionSummary, setTransactionSummary] = useState({ pending: 0, paid: 0 });
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
@@ -101,6 +105,22 @@ function Orders() {
   useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
+
+  const fetchTransactions = useCallback(async () => {
+    setTransactionsLoading(true);
+    try {
+      const data = await apiClient.getAdminTransactions({ page: 1, page_size: 200 });
+      setTransactions(data.items || []);
+      setTransactionSummary({
+        pending: Number(data.pending_payments || 0),
+        paid: Number(data.paid_payments || 0),
+      });
+    } catch (error) {
+      notifyError(error.response?.data?.detail || "Failed to fetch transactions");
+    } finally {
+      setTransactionsLoading(false);
+    }
+  }, []);
 
   const handleReleasePayout = (orderId) => {
     setConfirmDialog({
@@ -244,10 +264,12 @@ function Orders() {
   };
 
   const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-SG', {
-      style: 'currency',
-      currency: 'SGD',
-    }).format(amount || 0);
+    const value = Number(amount || 0);
+    const formatted = new Intl.NumberFormat('en-SG', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(Number.isFinite(value) ? value : 0);
+    return `S$${formatted}`;
   };
 
   const productUrl = (productId) => {
@@ -263,14 +285,28 @@ function Orders() {
   const orderDetailFields = (order) => {
     if (!order) return [];
     const productTitle = order.product_details?.title;
+    const totalAmount = Number(order.total_amount ?? order.total ?? 0);
+    const shippingCost = Number(order.shipping_cost || 0);
+    const buyerPlatformFee = Number(order.buyer_platform_fee || 0);
+    const sellerPlatformFee = Number(order.seller_platform_fee || order.driptyard_fee || 0);
+    const stripeFee = Number(order.stripe_fee || 0);
+    const promoDiscount = Number(order.discount_amount || 0);
+    const payableAmount = (totalAmount - sellerPlatformFee - stripeFee) + promoDiscount;
     const rows = [
       { label: "Order #", value: order.order_number },
       { label: "Order ID", value: order.id },
       { label: "Product", value: productTitle ? `${productTitle} (ID: ${order.product_details.id})` : String(order.product_details.id) },
       { label: "Date", value: order.created_at ? new Date(order.created_at).toLocaleString() : "—" },
-      { label: "Total", value: formatCurrency(order.total_amount) },
+      { label: "Total Amount", value: formatCurrency(totalAmount) },
       { label: "Unit price", value: formatCurrency(order.unit_price) },
       { label: "Quantity", value: order.quantity },
+      { label: "Shipping Cost", value: formatCurrency(shippingCost) },
+      { label: "Buyer Platform Fee", value: formatCurrency(buyerPlatformFee) },
+      { label: "Seller Platform Fee", value: formatCurrency(sellerPlatformFee) },
+      { label: "Stripe Fee (Seller)", value: formatCurrency(stripeFee) },
+      { label: "Promo Code", value: order.promo_code ?? "—" },
+      { label: "Promo Discount", value: formatCurrency(promoDiscount) },
+      { label: "Payable Amount", value: formatCurrency(payableAmount) },
       { label: "Status", value: order.status },
       { label: "Payment status", value: order.payment_status ?? "—" },
       { label: "Escrow status", value: order.escrow_status ?? "—" },
@@ -302,6 +338,15 @@ function Orders() {
             <p className="text-muted-foreground mt-1">Track and manage customer orders and escrow payouts</p>
           </div>
           <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setTransactionsOpen(true);
+                fetchTransactions();
+              }}
+            >
+              Transactions
+            </Button>
             <Button
               variant="outline"
               onClick={handleAutoConfirmReceipts}
@@ -395,6 +440,7 @@ function Orders() {
                     </TableRow>
                   ) : (
                     orders.map((order) => (
+                      
                       <TableRow key={order.id}>
                         <TableCell className="font-medium">{order.order_number}</TableCell>
                         <TableCell>
@@ -406,7 +452,37 @@ function Orders() {
                           </div>
                         </TableCell>
                         <TableCell>{new Date(order.created_at).toLocaleDateString()}</TableCell>
-                        <TableCell className="font-semibold">{formatCurrency(order.total_amount)}</TableCell>
+                        <TableCell>
+                          {(() => {
+                            const totalAmount = Number(order.total_amount ?? order.total ?? 0);
+                            const platformFees = Number(order.seller_platform_fee ?? order.driptyard_fee ?? 0);
+                            const stripeFees = Number(order.stripe_fee || 0);
+                            const promoDiscount = Number(order.discount_amount || 0);
+                            const payableAmount = (totalAmount - platformFees - stripeFees) + promoDiscount;
+                            return (
+                          <div className="flex flex-col gap-0.5 text-xs">
+                            <span className="font-semibold text-sm">{formatCurrency(totalAmount)}</span>
+                            <span className="text-muted-foreground">
+                              Total Amount: {formatCurrency(totalAmount)}
+                            </span>
+                            <span className="text-muted-foreground">
+                              Platform Fees: {formatCurrency(platformFees)}
+                            </span>
+                            <span className="text-muted-foreground">
+                              Stripe Fees: {formatCurrency(stripeFees)}
+                            </span>
+                            {promoDiscount > 0 && (
+                              <span className="text-muted-foreground">
+                                Promo Discount{order.promo_code ? ` (${order.promo_code})` : ""}: +{formatCurrency(promoDiscount)}
+                              </span>
+                            )}
+                            <span className="text-muted-foreground">
+                              Payable Amount: {formatCurrency(payableAmount)}
+                            </span>
+                          </div>
+                            );
+                          })()}
+                        </TableCell>
                         <TableCell>
                           <div className="flex flex-col gap-1">
                             <span className="text-xs font-medium">{order.fulfillment_method || 'delivery'}</span>
@@ -620,6 +696,63 @@ function Orders() {
                 )}
               </div>
             )}
+          </DialogContent>
+        </Dialog>
+        <Dialog open={transactionsOpen} onOpenChange={setTransactionsOpen}>
+          <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Transactions</DialogTitle>
+            </DialogHeader>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Card>
+                <CardContent className="p-4">
+                  <p className="text-xs text-muted-foreground">Pending Payments</p>
+                  <p className="text-xl font-semibold">{formatCurrency(transactionSummary.pending)}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <p className="text-xs text-muted-foreground">Paid Payments</p>
+                  <p className="text-xl font-semibold">{formatCurrency(transactionSummary.paid)}</p>
+                </CardContent>
+              </Card>
+            </div>
+            <div className="mt-2">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Event</TableHead>
+                    <TableHead>Order #</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {transactionsLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Loading transactions...</TableCell>
+                    </TableRow>
+                  ) : transactions.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No transactions found</TableCell>
+                    </TableRow>
+                  ) : (
+                    transactions.map((tx) => (
+                      <TableRow key={tx.id}>
+                        <TableCell>{new Date(tx.created_at).toLocaleDateString()}</TableCell>
+                        <TableCell className="capitalize">{tx.transaction_type}</TableCell>
+                        <TableCell>{tx.event_type}</TableCell>
+                        <TableCell>{tx.order_number || "—"}</TableCell>
+                        <TableCell>{tx.status || "—"}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(tx.amount)}</TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           </DialogContent>
         </Dialog>
         <ConfirmActionDialog

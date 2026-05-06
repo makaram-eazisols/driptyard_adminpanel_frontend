@@ -14,7 +14,7 @@ import {
   FileText,
   ShoppingCart,
   Truck,
-  KeyRound,
+  Settings,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { cn } from "@/lib/utils";
@@ -95,6 +95,7 @@ const buildMenuItems = (user) => {
   // Logs & Audit Trails - typically admin only
   if (isAdmin || user?.role === "admin") {
     items.push({ title: "Logs & Audit Trails", url: "/admin/logs", icon: FileText });
+    items.push({ title: "Settings", url: "/admin/settings", icon: Settings });
   }
 
   return items;

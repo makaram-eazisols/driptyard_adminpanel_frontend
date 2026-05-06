@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -16,7 +16,7 @@ import { Mail, Send, CheckCircle, Eye, EyeOff, Lock, Loader2, AlertCircle } from
 import { apiClient } from "@/lib/api-client";
 import { useAuth } from "@/hooks/use-auth";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { notifySuccess } from "@/lib/toast";
+import { notifyError, notifySuccess } from "@/lib/toast";
 
 function Settings() {
   const { user } = useAuth();
@@ -37,6 +37,53 @@ function Settings() {
   const [passwordErrors, setPasswordErrors] = useState({});
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [promoCodes, setPromoCodes] = useState([]);
+  const [isLoadingPromoCodes, setIsLoadingPromoCodes] = useState(false);
+  const [isSavingPromoCode, setIsSavingPromoCode] = useState(false);
+  const [platformFees, setPlatformFees] = useState({
+    buyer_fee_percentage: "",
+    seller_fee_percentage: "",
+    seller_stripe_fee_percentage: "",
+  });
+  const [isSavingPlatformFees, setIsSavingPlatformFees] = useState(false);
+  const [promoForm, setPromoForm] = useState({
+    code: "",
+    discount_type: "percentage",
+    discount_value: "",
+    start_date: "",
+    end_date: "",
+    max_uses: "",
+    is_active: true,
+  });
+
+  const loadPromoCodes = async () => {
+    setIsLoadingPromoCodes(true);
+    try {
+      const data = await apiClient.getPromoCodes();
+      setPromoCodes(Array.isArray(data) ? data : []);
+    } catch (error) {
+      notifyError(error?.response?.data?.message || "Failed to load promo codes.");
+    } finally {
+      setIsLoadingPromoCodes(false);
+    }
+  };
+
+  useEffect(() => {
+    loadPromoCodes();
+    const loadPlatformFees = async () => {
+      try {
+        const fees = await apiClient.getPlatformFees();
+        setPlatformFees({
+          buyer_fee_percentage: String(fees?.buyer_fee_percentage ?? "0"),
+          seller_fee_percentage: String(fees?.seller_fee_percentage ?? "0"),
+          seller_stripe_fee_percentage: String(fees?.seller_stripe_fee_percentage ?? "2.9"),
+        });
+      } catch (error) {
+        notifyError(error?.response?.data?.message || "Failed to load platform fee settings.");
+      }
+    };
+    loadPlatformFees();
+  }, []);
 
   const handleTestEmail = () => {
     notifySuccess(`A test email has been sent to ${testEmail}`);
@@ -115,6 +162,88 @@ function Settings() {
       }
     } finally {
       setIsChangingPassword(false);
+    }
+  };
+
+  const handleCreatePromoCode = async () => {
+    const code = promoForm.code.trim().toUpperCase();
+    if (!code) {
+      notifyError("Promo code is required.");
+      return;
+    }
+    if (!promoForm.discount_value || Number(promoForm.discount_value) <= 0) {
+      notifyError("Discount value must be greater than 0.");
+      return;
+    }
+
+    setIsSavingPromoCode(true);
+    try {
+      await apiClient.createPromoCode({
+        code,
+        discount_type: promoForm.discount_type,
+        discount_value: Number(promoForm.discount_value),
+        start_date: promoForm.start_date ? new Date(promoForm.start_date).toISOString() : null,
+        end_date: promoForm.end_date ? new Date(promoForm.end_date).toISOString() : null,
+        max_uses: promoForm.max_uses ? Number(promoForm.max_uses) : null,
+        is_active: promoForm.is_active,
+      });
+      notifySuccess("Promo code created successfully.");
+      setPromoForm({
+        code: "",
+        discount_type: "percentage",
+        discount_value: "",
+        start_date: "",
+        end_date: "",
+        max_uses: "",
+        is_active: true,
+      });
+      await loadPromoCodes();
+    } catch (error) {
+      notifyError(error?.response?.data?.message || "Failed to create promo code.");
+    } finally {
+      setIsSavingPromoCode(false);
+    }
+  };
+
+  const togglePromoCodeStatus = async (promo) => {
+    try {
+      await apiClient.updatePromoCode(promo.id, { is_active: !promo.is_active });
+      notifySuccess("Promo code updated.");
+      await loadPromoCodes();
+    } catch (error) {
+      notifyError(error?.response?.data?.message || "Failed to update promo code.");
+    }
+  };
+
+  const savePlatformFees = async () => {
+    const buyerFee = Number(platformFees.buyer_fee_percentage);
+    const sellerFee = Number(platformFees.seller_fee_percentage);
+    const sellerStripeFee = Number(platformFees.seller_stripe_fee_percentage);
+    if (!Number.isFinite(buyerFee) || buyerFee < 0 || buyerFee > 100) {
+      notifyError("Buyer fee must be between 0 and 100.");
+      return;
+    }
+    if (!Number.isFinite(sellerFee) || sellerFee < 0 || sellerFee > 100) {
+      notifyError("Seller fee must be between 0 and 100.");
+      return;
+    }
+    if (!Number.isFinite(sellerStripeFee) || sellerStripeFee < 0 || sellerStripeFee > 100) {
+      notifyError("Seller Stripe fee must be between 0 and 100.");
+      return;
+    }
+
+    setIsSavingPlatformFees(true);
+    try {
+      await apiClient.updatePlatformFees({
+        buyer_fee_percentage: buyerFee,
+        seller_fee_percentage: sellerFee,
+        seller_stripe_fee_percentage: sellerStripeFee,
+      });
+      notifySuccess("Platform fees updated successfully.");
+    } catch (error) {
+      notifyError(error?.response?.data?.message || "Failed to update platform fee settings.");
+    } finally {
+      setIsSavingPlatformFees(false);
     }
   };
 
@@ -526,7 +655,7 @@ function Settings() {
                     <Textarea 
                       id="order-template" 
                       rows={6}
-                      defaultValue="Hi {{name}},\n\nThanks for your order! We've received your order #{{order_id}}.\n\nOrder Total: ${{total}}\n\nWe'll send you another email once your items ship.\n\nThe DRIPTYARD Team"
+                      defaultValue="Hi {{name}},\n\nThanks for your order! We've received your order #{{order_id}}.\n\nOrder Total: S${{total}}\n\nWe'll send you another email once your items ship.\n\nThe DRIPTYARD Team"
                     />
                   </div>
                   <Separator />
@@ -539,7 +668,7 @@ function Settings() {
                     <Textarea 
                       id="payout-template" 
                       rows={6}
-                      defaultValue="Hi {{seller_name}},\n\nGreat news! Your payout request of ${{amount}} has been approved.\n\nThe funds will be transferred to your account within 2-3 business days.\n\nThe DRIPTYARD Team"
+                      defaultValue="Hi {{seller_name}},\n\nGreat news! Your payout request of S${{amount}} has been approved.\n\nThe funds will be transferred to your account within 2-3 business days.\n\nThe DRIPTYARD Team"
                     />
                   </div>
                   <p className="text-sm text-muted-foreground">
@@ -626,6 +755,196 @@ function Settings() {
           </CardContent>
         </Card>
         </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>Promo Code Settings</CardTitle>
+            <CardDescription>Create and manage checkout promo codes.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="promo-code">Code</Label>
+                <Input
+                  id="promo-code"
+                  placeholder="WELCOME10"
+                  value={promoForm.code}
+                  onChange={(e) => setPromoForm((prev) => ({ ...prev, code: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Discount Type</Label>
+                <Select
+                  value={promoForm.discount_type}
+                  onValueChange={(value) => setPromoForm((prev) => ({ ...prev, discount_type: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="percentage">Percentage</SelectItem>
+                    <SelectItem value="fixed">Fixed Amount</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="discount-value">Discount Value</Label>
+                <Input
+                  id="discount-value"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={promoForm.discount_value}
+                  onChange={(e) => setPromoForm((prev) => ({ ...prev, discount_value: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="start-date">Start Date</Label>
+                <Input
+                  id="start-date"
+                  type="datetime-local"
+                  value={promoForm.start_date}
+                  onChange={(e) => setPromoForm((prev) => ({ ...prev, start_date: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="end-date">End Date</Label>
+                <Input
+                  id="end-date"
+                  type="datetime-local"
+                  value={promoForm.end_date}
+                  onChange={(e) => setPromoForm((prev) => ({ ...prev, end_date: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="max-uses">Max Uses (optional)</Label>
+                <Input
+                  id="max-uses"
+                  type="number"
+                  min="1"
+                  value={promoForm.max_uses}
+                  onChange={(e) => setPromoForm((prev) => ({ ...prev, max_uses: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={promoForm.is_active}
+                  onCheckedChange={(value) => setPromoForm((prev) => ({ ...prev, is_active: !!value }))}
+                />
+                <Label>Active</Label>
+              </div>
+              <Button
+                onClick={handleCreatePromoCode}
+                disabled={isSavingPromoCode}
+                className="gradient-driptyard-hover text-white shadow-md"
+              >
+                {isSavingPromoCode ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Add Promo Code"
+                )}
+              </Button>
+            </div>
+
+            <Separator />
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold">Existing Promo Codes</h3>
+              {isLoadingPromoCodes ? (
+                <p className="text-sm text-muted-foreground">Loading promo codes...</p>
+              ) : promoCodes.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No promo codes yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {promoCodes.map((promo) => (
+                    <div key={promo.id} className="border border-border rounded-md p-3 flex items-center justify-between">
+                      <div className="text-sm">
+                        <p className="font-semibold">{promo.code}</p>
+                        <p className="text-muted-foreground">
+                          {promo.discount_type === "percentage" ? `${promo.discount_value}%` : `S$${promo.discount_value}`} •
+                          Used {promo.used_count}{promo.max_uses ? ` / ${promo.max_uses}` : ""}
+                        </p>
+                      </div>
+                      <Button variant="outline" size="sm" onClick={() => togglePromoCodeStatus(promo)}>
+                        {promo.is_active ? "Disable" : "Enable"}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Platform Fee Settings</CardTitle>
+            <CardDescription>
+              Configure buyer and seller platform/admin fee percentages.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="buyer-platform-fee">Buyer Platform Fee (%)</Label>
+                <Input
+                  id="buyer-platform-fee"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={platformFees.buyer_fee_percentage}
+                  onChange={(e) => setPlatformFees((prev) => ({ ...prev, buyer_fee_percentage: e.target.value }))}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Added to buyer total at checkout.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="seller-platform-fee">Seller Platform Fee (%)</Label>
+                <Input
+                  id="seller-platform-fee"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={platformFees.seller_fee_percentage}
+                  onChange={(e) => setPlatformFees((prev) => ({ ...prev, seller_fee_percentage: e.target.value }))}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Deducted from seller payout.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="seller-stripe-fee">Seller Stripe Fee (%)</Label>
+                <Input
+                  id="seller-stripe-fee"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={platformFees.seller_stripe_fee_percentage}
+                  onChange={(e) => setPlatformFees((prev) => ({ ...prev, seller_stripe_fee_percentage: e.target.value }))}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Deducted from seller payout as Stripe fee.
+                </p>
+              </div>
+            </div>
+            <Button onClick={savePlatformFees} disabled={isSavingPlatformFees} className="gradient-driptyard-hover text-white shadow-md">
+              {isSavingPlatformFees ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save Platform Fees"
+              )}
+            </Button>
+          </CardContent>
+        </Card>
         {/* <Card>
           <CardHeader>
             <CardTitle>Store Information</CardTitle>

@@ -79,7 +79,7 @@ export const AdminHeader = () => {
       <div className="flex items-center gap-2">
         <Popover open={isNotificationOpen} onOpenChange={setIsNotificationOpen}>
           <PopoverTrigger asChild>
-            <Button 
+            {/* <Button 
               variant="ghost" 
               size="icon" 
               className="relative hover:bg-muted rounded-lg"
@@ -88,7 +88,7 @@ export const AdminHeader = () => {
               {unreadCount > 0 && (
                 <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-accent rounded-full ring-2 ring-background"></span>
               )}
-            </Button>
+            </Button> */}
           </PopoverTrigger>
           <PopoverContent align="end" className="w-80 p-0 shadow-lg border border-border rounded-xl overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 bg-muted/40 border-b">

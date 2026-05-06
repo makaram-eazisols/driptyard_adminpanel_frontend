@@ -5,7 +5,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Edit2, Trash2, Loader2, MoreVertical, ChevronLeft, ChevronRight, Filter, X, Eye, Ban, Unlock, KeyRound, EyeOff, Plus } from "lucide-react";
+import { Search, Edit2, Trash2, Loader2, MoreVertical, ChevronLeft, ChevronRight, Filter, X, Eye, Ban, Unlock, KeyRound, EyeOff, Plus, CheckCircle, XCircle } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -89,6 +89,7 @@ function Users() {
   const [bulkSuspendDialog, setBulkSuspendDialog] = useState(false);
   const [bulkReinstateDialog, setBulkReinstateDialog] = useState(false);
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
+  const [businessVerificationUpdatingUserId, setBusinessVerificationUpdatingUserId] = useState(null);
 
   // Check manage users permission
   const canManageUsers = user?.is_admin || user?.permissions?.can_manage_users === true;
@@ -412,6 +413,56 @@ function Users() {
       label: "Basic",
       className: "bg-slate-100 text-slate-700 border-slate-200",
     };
+  };
+
+  const getBusinessVerificationStatus = (targetUser) => {
+    const rawStatus = String(targetUser?.business_verification_status || "")
+      .trim()
+      .toLowerCase();
+    if (["pending", "verified", "rejected"].includes(rawStatus)) {
+      return rawStatus;
+    }
+    return targetUser?.business_profile ? "pending" : "verified";
+  };
+
+  const getBusinessVerificationBadgeVariant = (targetUser) => {
+    const status = getBusinessVerificationStatus(targetUser);
+    if (status === "verified") return "success";
+    if (status === "rejected") return "destructive";
+    return "pending";
+  };
+
+  const getBusinessVerificationBadgeLabel = (targetUser) => {
+    if (!targetUser?.business_profile) return "N/A";
+    const status = getBusinessVerificationStatus(targetUser);
+    if (status === "verified") return "Verified";
+    if (status === "rejected") return "Rejected";
+    return "Pending";
+  };
+
+  const handleBusinessVerificationStatusUpdate = async (targetUser, statusValue) => {
+    const userId = targetUser?.id || targetUser?.user_id;
+    if (!userId) {
+      notifyError("Unable to update business verification status");
+      return;
+    }
+
+    if (!targetUser?.business_profile) {
+      notifyError("This user is not a business profile");
+      return;
+    }
+
+    setBusinessVerificationUpdatingUserId(userId);
+    try {
+      const response = await apiClient.updateBusinessVerificationStatus(userId, statusValue);
+      notifySuccess(response?.message || `Business profile ${statusValue} successfully.`);
+      fetchUsers();
+    } catch (error) {
+      console.error("Failed to update business verification status:", error);
+      notifyError(error.response?.data?.detail || "Failed to update business verification status");
+    } finally {
+      setBusinessVerificationUpdatingUserId(null);
+    }
   };
 
   const handleUsernameDoubleClick = (user) => {
@@ -853,6 +904,7 @@ function Users() {
                       <TableHead className="h-12 px-4 font-semibold text-secondary">Listings</TableHead>
                       <TableHead className="h-12 px-4 font-semibold text-secondary">Plan</TableHead>
                       <TableHead className="h-12 px-4 font-semibold text-secondary">Status</TableHead>
+                      <TableHead className="h-12 px-4 font-semibold text-secondary">Business Verification</TableHead>
                       <TableHead className="h-12 px-4 font-semibold text-secondary">Joined</TableHead>
                       {canManageUsers && (
                         <TableHead className="h-12 px-4 text-right font-semibold text-secondary">Actions</TableHead>
@@ -894,6 +946,18 @@ function Users() {
                         </TableCell>
                         <TableCell className="py-3 px-4">
                           <Badge variant={getStatusBadgeVariant(user)} className="text-xs">{getStatusText(user)}</Badge>
+                        </TableCell>
+                        <TableCell className="py-3 px-4">
+                          {user.business_profile ? (
+                            <Badge
+                              variant={getBusinessVerificationBadgeVariant(user)}
+                              className="text-xs"
+                            >
+                              {getBusinessVerificationBadgeLabel(user)}
+                            </Badge>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">N/A</span>
+                          )}
                         </TableCell>
                         <TableCell className="py-3 px-4">
                           <p className="text-sm text-foreground">{format(new Date(user.created_at), "MMM dd, yyyy")}</p>
@@ -979,6 +1043,32 @@ function Users() {
                                   <KeyRound className="h-4 w-4 mr-2" />
                                   Reset Password
                                 </DropdownMenuItem>
+                                {user.business_profile && (
+                                  <>
+                                    <DropdownMenuItem
+                                      className="cursor-pointer"
+                                      disabled={
+                                        businessVerificationUpdatingUserId === (user.id || user.user_id) ||
+                                        getBusinessVerificationStatus(user) === "verified"
+                                      }
+                                      onClick={() => handleBusinessVerificationStatusUpdate(user, "verified")}
+                                    >
+                                      <CheckCircle className="h-4 w-4 mr-2" />
+                                      Approve Business
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      className="cursor-pointer"
+                                      disabled={
+                                        businessVerificationUpdatingUserId === (user.id || user.user_id) ||
+                                        getBusinessVerificationStatus(user) === "rejected"
+                                      }
+                                      onClick={() => handleBusinessVerificationStatusUpdate(user, "rejected")}
+                                    >
+                                      <XCircle className="h-4 w-4 mr-2" />
+                                      Reject Business
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
                                 <DropdownMenuItem
                                   className="text-destructive cursor-pointer focus:text-destructive"
                                   onClick={() => setDeleteUserId(user.id)}
