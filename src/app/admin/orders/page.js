@@ -572,7 +572,10 @@ function Orders() {
                             >
                               <FileText className="" />
                             </Button>
-                            {order.status === 'PAID_ESCROW' && order.buyer_confirmed_receipt && (
+                            {order.payout_requested &&
+                              order.buyer_confirmed_receipt &&
+                              order.escrow_status !== 'RELEASED' &&
+                              order.payout_status !== 'PAID_OUT' && (
                               <Button
                                 size="sm"
                                 onClick={() => handleReleasePayout(order.id)}
@@ -582,7 +585,7 @@ function Orders() {
                                 Release Payout
                               </Button>
                             )}
-                            {order.status === 'RELEASED' && (
+                            {order.escrow_status === 'RELEASED' && order.payout_status !== 'PAID_OUT' && (
                               <Button
                                 size="sm"
                                 variant="outline"
