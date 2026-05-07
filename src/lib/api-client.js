@@ -515,6 +515,64 @@ class ApiClient {
     return response.data;
   }
 
+  async getEducationalTips() {
+    const response = await this.client.get("/educational-tips");
+    return response.data;
+  }
+
+  async createEducationalTip(data) {
+    const response = await this.client.post("/educational-tips", data);
+    return response.data;
+  }
+
+  async updateEducationalTip(tipId, data) {
+    const response = await this.client.put(`/educational-tips/${tipId}`, data);
+    return response.data;
+  }
+
+  async deleteEducationalTip(tipId) {
+    const response = await this.client.delete(`/educational-tips/${tipId}`);
+    return response.data;
+  }
+
+  async getAdminMembershipPlans() {
+    const response = await this.client.get("/admin/membership-catalog/membership-plans");
+    return response.data;
+  }
+
+  async createAdminMembershipPlan(data) {
+    const response = await this.client.post("/admin/membership-catalog/membership-plans", data);
+    return response.data;
+  }
+
+  async updateAdminMembershipPlan(planId, data) {
+    const response = await this.client.put(`/admin/membership-catalog/membership-plans/${planId}`, data);
+    return response.data;
+  }
+
+  async deleteAdminMembershipPlan(planId) {
+    await this.client.delete(`/admin/membership-catalog/membership-plans/${planId}`);
+  }
+
+  async getAdminPointsCards() {
+    const response = await this.client.get("/admin/membership-catalog/points-cards");
+    return response.data;
+  }
+
+  async createAdminPointsCard(data) {
+    const response = await this.client.post("/admin/membership-catalog/points-cards", data);
+    return response.data;
+  }
+
+  async updateAdminPointsCard(cardId, data) {
+    const response = await this.client.put(`/admin/membership-catalog/points-cards/${cardId}`, data);
+    return response.data;
+  }
+
+  async deleteAdminPointsCard(cardId) {
+    await this.client.delete(`/admin/membership-catalog/points-cards/${cardId}`);
+  }
+
   // ============ MODERATORS ENDPOINTS ============
   async getModerators(params) {
     const response = await this.client.get("/moderators", { params });

@@ -12,11 +12,12 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Mail, Send, CheckCircle, Eye, EyeOff, Lock, Loader2, AlertCircle } from "lucide-react";
+import { Mail, Send, CheckCircle, Eye, EyeOff, Lock, Loader2, AlertCircle, Pencil, Trash2 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import { useAuth } from "@/hooks/use-auth";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { notifyError, notifySuccess } from "@/lib/toast";
+import { MembershipSettingsSection } from "@/components/admin/MembershipSettingsSection";
 
 function Settings() {
   const { user } = useAuth();
@@ -31,6 +32,7 @@ function Settings() {
   const [showEasyparcelClientSecret, setShowEasyparcelClientSecret] = useState(false);
   const [showEasyparcelEncryptionKey, setShowEasyparcelEncryptionKey] = useState(false);
   const [showGoogleClientSecret, setShowGoogleClientSecret] = useState(false);
+  const [showGoogleMapApiKey, setShowGoogleMapApiKey] = useState(false);
   
   // Password reset states
   const [currentPassword, setCurrentPassword] = useState("");
@@ -45,6 +47,15 @@ function Settings() {
   const [promoCodes, setPromoCodes] = useState([]);
   const [isLoadingPromoCodes, setIsLoadingPromoCodes] = useState(false);
   const [isSavingPromoCode, setIsSavingPromoCode] = useState(false);
+  const [educationalTips, setEducationalTips] = useState([]);
+  const [isLoadingEducationalTips, setIsLoadingEducationalTips] = useState(false);
+  const [isSavingEducationalTip, setIsSavingEducationalTip] = useState(false);
+  const [editingTipId, setEditingTipId] = useState(null);
+  const [educationalTipForm, setEducationalTipForm] = useState({
+    title: "",
+    content: "",
+    is_active: true,
+  });
   const [platformFees, setPlatformFees] = useState({
     buyer_fee_percentage: "",
     seller_fee_percentage: "",
@@ -72,6 +83,7 @@ function Settings() {
     email_from_address: "noreply@driptyard.com",
     google_client_id: "",
     google_client_secret: "",
+    google_map_api_key: "",
   });
   const [promoForm, setPromoForm] = useState({
     code: "",
@@ -95,8 +107,21 @@ function Settings() {
     }
   };
 
+  const loadEducationalTips = async () => {
+    setIsLoadingEducationalTips(true);
+    try {
+      const data = await apiClient.getEducationalTips();
+      setEducationalTips(Array.isArray(data) ? data : []);
+    } catch (error) {
+      notifyError(error?.response?.data?.message || "Failed to load educational tips.");
+    } finally {
+      setIsLoadingEducationalTips(false);
+    }
+  };
+
   useEffect(() => {
     loadPromoCodes();
+    loadEducationalTips();
     const loadIntegrationSettings = async () => {
       try {
         const config = await apiClient.getIntegrationSettings();
@@ -120,6 +145,81 @@ function Settings() {
     loadPlatformFees();
     loadIntegrationSettings();
   }, []);
+
+  const resetEducationalTipForm = () => {
+    setEducationalTipForm({
+      title: "",
+      content: "",
+      is_active: true,
+    });
+    setEditingTipId(null);
+  };
+
+  const handleSaveEducationalTip = async () => {
+    const title = educationalTipForm.title.trim();
+    const content = educationalTipForm.content.trim();
+    if (!title || !content) {
+      notifyError("Tip title and content are required.");
+      return;
+    }
+
+    setIsSavingEducationalTip(true);
+    try {
+      if (editingTipId) {
+        await apiClient.updateEducationalTip(editingTipId, {
+          title,
+          content,
+          is_active: educationalTipForm.is_active,
+        });
+        notifySuccess("Educational tip updated.");
+      } else {
+        await apiClient.createEducationalTip({
+          title,
+          content,
+          is_active: educationalTipForm.is_active,
+        });
+        notifySuccess("Educational tip created.");
+      }
+      resetEducationalTipForm();
+      await loadEducationalTips();
+    } catch (error) {
+      notifyError(error?.response?.data?.message || "Failed to save educational tip.");
+    } finally {
+      setIsSavingEducationalTip(false);
+    }
+  };
+
+  const handleEditEducationalTip = (tip) => {
+    setEditingTipId(tip.id);
+    setEducationalTipForm({
+      title: tip.title || "",
+      content: tip.content || "",
+      is_active: !!tip.is_active,
+    });
+  };
+
+  const handleDeleteEducationalTip = async (tipId) => {
+    try {
+      await apiClient.deleteEducationalTip(tipId);
+      notifySuccess("Educational tip deleted.");
+      if (editingTipId === tipId) {
+        resetEducationalTipForm();
+      }
+      await loadEducationalTips();
+    } catch (error) {
+      notifyError(error?.response?.data?.message || "Failed to delete educational tip.");
+    }
+  };
+
+  const handleToggleEducationalTipStatus = async (tip) => {
+    try {
+      await apiClient.updateEducationalTip(tip.id, { is_active: !tip.is_active });
+      notifySuccess("Educational tip status updated.");
+      await loadEducationalTips();
+    } catch (error) {
+      notifyError(error?.response?.data?.message || "Failed to update tip status.");
+    }
+  };
 
   const handleTestEmail = async () => {
     if (!testEmail) {
@@ -462,6 +562,128 @@ function Settings() {
                   Change Password
                 </>
               )}
+            </Button>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Educational Tips</CardTitle>
+            <CardDescription>
+              Manage in-app educational notifications shown to users.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="space-y-2">
+              <Label htmlFor="educational-tip-title">Title</Label>
+              <Input
+                id="educational-tip-title"
+                placeholder="Tip title"
+                value={educationalTipForm.title}
+                onChange={(e) => setEducationalTipForm((prev) => ({ ...prev, title: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="educational-tip-content">Content</Label>
+              <Textarea
+                id="educational-tip-content"
+                rows={4}
+                placeholder="Tip content"
+                value={educationalTipForm.content}
+                onChange={(e) => setEducationalTipForm((prev) => ({ ...prev, content: e.target.value }))}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={educationalTipForm.is_active}
+                  onCheckedChange={(value) => setEducationalTipForm((prev) => ({ ...prev, is_active: !!value }))}
+                />
+                <Label>Enabled</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                {editingTipId && (
+                  <Button variant="outline" onClick={resetEducationalTipForm}>
+                    Cancel Edit
+                  </Button>
+                )}
+                <Button
+                  onClick={handleSaveEducationalTip}
+                  disabled={isSavingEducationalTip}
+                  className="gradient-driptyard-hover text-white shadow-md"
+                >
+                  {isSavingEducationalTip ? "Saving..." : editingTipId ? "Update Tip" : "Create Tip"}
+                </Button>
+              </div>
+            </div>
+
+            <Separator />
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold">Existing Educational Tips</h3>
+              {isLoadingEducationalTips ? (
+                <p className="text-sm text-muted-foreground">Loading educational tips...</p>
+              ) : educationalTips.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No educational tips yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {educationalTips.map((tip) => (
+                    <div key={tip.id} className="border border-border rounded-md p-3 flex items-start justify-between gap-4">
+                      <div className="text-sm">
+                        <p className="font-semibold">{tip.title}</p>
+                        <p className="text-muted-foreground line-clamp-2">{tip.content}</p>
+                        <p className="text-xs mt-1 text-muted-foreground">
+                          Status: {tip.is_active ? "Enabled" : "Disabled"}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Button variant="outline" size="sm" onClick={() => handleEditEducationalTip(tip)}>
+                          <Pencil className="h-3 w-3 mr-1" />
+                          Edit
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => handleToggleEducationalTipStatus(tip)}>
+                          {tip.is_active ? "Disable" : "Enable"}
+                        </Button>
+                        <Button variant="destructive" size="sm" onClick={() => handleDeleteEducationalTip(tip.id)}>
+                          <Trash2 className="h-3 w-3 mr-1" />
+                          Delete
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+        <MembershipSettingsSection />
+        <Card>
+          <CardHeader className="pb-4">
+            <CardTitle>Google Maps Configuration</CardTitle>
+            <CardDescription>
+              Configure the Google Maps API key used for address autocomplete across storefront and checkout.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="google-map-api-key">Google Maps API Key</Label>
+              <div className="relative">
+                <Input
+                  id="google-map-api-key"
+                  type={showGoogleMapApiKey ? "text" : "password"}
+                  className="pr-10"
+                  value={integrationSettings.google_map_api_key || ""}
+                  onChange={(e) => setIntegrationSettings((prev) => ({ ...prev, google_map_api_key: e.target.value }))}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowGoogleMapApiKey(!showGoogleMapApiKey)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showGoogleMapApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+            <Button onClick={handleSaveIntegrations} disabled={isSavingIntegrations} className="gradient-driptyard-hover text-white shadow-md">
+              {isSavingIntegrations ? "Saving..." : "Save Google Maps Settings"}
             </Button>
           </CardContent>
         </Card>

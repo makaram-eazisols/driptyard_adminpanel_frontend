@@ -37,7 +37,6 @@ import TextPromptDialog from "@/components/modals/TextPromptDialog";
 
 const STATUS_OPTIONS = [
   { label: "All Statuses", value: "all" },
-  { label: "Pending Payment", value: "PENDING_PAYMENT" },
   { label: "Paid (Escrow)", value: "PAID_ESCROW" },
   { label: "Confirmed", value: "CONFIRMED" },
   { label: "Processing", value: "PROCESSING" },
@@ -82,6 +81,14 @@ function Orders() {
   const [transactionsLoading, setTransactionsLoading] = useState(false);
   const [transactions, setTransactions] = useState([]);
   const [transactionSummary, setTransactionSummary] = useState({ pending: 0, paid: 0 });
+  const [selectedTransaction, setSelectedTransaction] = useState(null);
+  const [invoiceOpen, setInvoiceOpen] = useState(false);
+  const [transactionFilters, setTransactionFilters] = useState({
+    transaction_type: "all",
+    status: "all",
+    start_date: "",
+    end_date: "",
+  });
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
@@ -109,7 +116,14 @@ function Orders() {
   const fetchTransactions = useCallback(async () => {
     setTransactionsLoading(true);
     try {
-      const data = await apiClient.getAdminTransactions({ page: 1, page_size: 200 });
+      const data = await apiClient.getAdminTransactions({
+        page: 1,
+        page_size: 200,
+        transaction_type: transactionFilters.transaction_type === "all" ? undefined : transactionFilters.transaction_type,
+        status: transactionFilters.status === "all" ? undefined : transactionFilters.status,
+        start_date: transactionFilters.start_date || undefined,
+        end_date: transactionFilters.end_date || undefined,
+      });
       setTransactions(data.items || []);
       setTransactionSummary({
         pending: Number(data.pending_payments || 0),
@@ -120,7 +134,12 @@ function Orders() {
     } finally {
       setTransactionsLoading(false);
     }
-  }, []);
+  }, [transactionFilters]);
+
+  const openInvoice = (tx) => {
+    setSelectedTransaction(tx);
+    setInvoiceOpen(true);
+  };
 
   const handleReleasePayout = (orderId) => {
     setConfirmDialog({
@@ -272,6 +291,17 @@ function Orders() {
     return `S$${formatted}`;
   };
 
+  const truncateWithTitle = (value) => {
+    const text = String(value || "—");
+    if (text.length <= 10) return { short: text, full: text };
+    return { short: `${text.slice(0, 10)}...`, full: text };
+  };
+
+  const displayType = (value) => {
+    if ((value || "").toLowerCase() === "membership") return "Package";
+    return value || "—";
+  };
+
   const productUrl = (productId) => {
     const websiteUrl = process.env.NEXT_PUBLIC_WEBSITE_URL || "https://driptyard.vercel.app";
     // Ensure proper URL construction with /products/ path
@@ -291,7 +321,7 @@ function Orders() {
     const sellerPlatformFee = Number(order.seller_platform_fee || order.driptyard_fee || 0);
     const stripeFee = Number(order.stripe_fee || 0);
     const promoDiscount = Number(order.discount_amount || 0);
-    const payableAmount = (totalAmount - sellerPlatformFee - stripeFee) + promoDiscount;
+    const payableAmount = (totalAmount - stripeFee - sellerPlatformFee) + promoDiscount;
     const rows = [
       { label: "Order #", value: order.order_number },
       { label: "Order ID", value: order.id },
@@ -458,7 +488,7 @@ function Orders() {
                             const platformFees = Number(order.seller_platform_fee ?? order.driptyard_fee ?? 0);
                             const stripeFees = Number(order.stripe_fee || 0);
                             const promoDiscount = Number(order.discount_amount || 0);
-                            const payableAmount = (totalAmount - platformFees - stripeFees) + promoDiscount;
+                            const payableAmount = (totalAmount - stripeFees - platformFees) + promoDiscount;
                             return (
                           <div className="flex flex-col gap-0.5 text-xs">
                             <span className="font-semibold text-sm">{formatCurrency(totalAmount)}</span>
@@ -699,7 +729,7 @@ function Orders() {
           </DialogContent>
         </Dialog>
         <Dialog open={transactionsOpen} onOpenChange={setTransactionsOpen}>
-          <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-7xl w-[96vw] max-h-[90vh] overflow-hidden">
             <DialogHeader>
               <DialogTitle>Transactions</DialogTitle>
             </DialogHeader>
@@ -718,41 +748,167 @@ function Orders() {
               </Card>
             </div>
             <div className="mt-2">
-              <Table>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
+                <div className="space-y-2">
+                  <Label htmlFor="admin-tx-type">Type</Label>
+                  <Select
+                    value={transactionFilters.transaction_type}
+                    onValueChange={(value) => setTransactionFilters((prev) => ({ ...prev, transaction_type: value }))}
+                  >
+                    <SelectTrigger id="admin-tx-type">
+                      <SelectValue placeholder="All Types" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Types</SelectItem>
+                      <SelectItem value="membership">Package</SelectItem>
+                      <SelectItem value="points">Points</SelectItem>
+                      <SelectItem value="order">Order</SelectItem>
+                      <SelectItem value="refund">Refund</SelectItem>
+                      <SelectItem value="payout">Payout</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="admin-tx-status">Status</Label>
+                  <Select
+                    value={transactionFilters.status}
+                    onValueChange={(value) => setTransactionFilters((prev) => ({ ...prev, status: value }))}
+                  >
+                    <SelectTrigger id="admin-tx-status">
+                      <SelectValue placeholder="All Statuses" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Statuses</SelectItem>
+                      <SelectItem value="paid">Paid</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="refunded">Refunded</SelectItem>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="admin-tx-start-date">Start Date</Label>
+                  <Input
+                    id="admin-tx-start-date"
+                    type="date"
+                    value={transactionFilters.start_date}
+                    onChange={(e) => setTransactionFilters((prev) => ({ ...prev, start_date: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="admin-tx-end-date">End Date</Label>
+                  <Input
+                    id="admin-tx-end-date"
+                    type="date"
+                    value={transactionFilters.end_date}
+                    onChange={(e) => setTransactionFilters((prev) => ({ ...prev, end_date: e.target.value }))}
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end mb-3">
+                <Button variant="outline" size="sm" onClick={fetchTransactions} disabled={transactionsLoading}>
+                  Apply Filters
+                </Button>
+              </div>
+              <div>
+              <Table className="table-fixed w-full">
+                <colgroup>
+                  <col className="w-[12%]" />
+                  <col className="w-[13%]" />
+                  <col className="w-[13%]" />
+                  <col className="w-[9%]" />
+                  <col className="w-[12%]" />
+                  <col className="w-[15%]" />
+                  <col className="w-[10%]" />
+                  <col className="w-[8%]" />
+                  <col className="w-[8%]" />
+                </colgroup>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Date</TableHead>
+                    <TableHead>Transaction ID</TableHead>
+                    <TableHead>User Name</TableHead>
+                    <TableHead>Email</TableHead>
                     <TableHead>Type</TableHead>
-                    <TableHead>Event</TableHead>
-                    <TableHead>Order #</TableHead>
+                    <TableHead>Item Name</TableHead>
+                    <TableHead>Payment Date</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
+              </Table>
+              </div>
+              <div className={transactions.length > 6 ? "max-h-[312px] overflow-y-auto" : ""}>
+              <Table className="table-fixed w-full">
+                <colgroup>
+                  <col className="w-[12%]" />
+                  <col className="w-[13%]" />
+                  <col className="w-[13%]" />
+                  <col className="w-[9%]" />
+                  <col className="w-[12%]" />
+                  <col className="w-[15%]" />
+                  <col className="w-[10%]" />
+                  <col className="w-[8%]" />
+                  <col className="w-[8%]" />
+                </colgroup>
                 <TableBody>
                   {transactionsLoading ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Loading transactions...</TableCell>
+                      <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Loading transactions...</TableCell>
                     </TableRow>
                   ) : transactions.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No transactions found</TableCell>
+                      <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">No transactions found</TableCell>
                     </TableRow>
                   ) : (
                     transactions.map((tx) => (
                       <TableRow key={tx.id}>
-                        <TableCell>{new Date(tx.created_at).toLocaleDateString()}</TableCell>
-                        <TableCell className="capitalize">{tx.transaction_type}</TableCell>
-                        <TableCell>{tx.event_type}</TableCell>
-                        <TableCell>{tx.order_number || "—"}</TableCell>
-                        <TableCell>{tx.status || "—"}</TableCell>
+                        <TableCell>{tx.id}</TableCell>
+                        <TableCell title={truncateWithTitle(tx.user_name || tx.buyer_name || tx.seller_name || "—").full}>
+                          {truncateWithTitle(tx.user_name || tx.buyer_name || tx.seller_name || "—").short}
+                        </TableCell>
+                        <TableCell title={truncateWithTitle(tx.user_email || tx.buyer_email || tx.seller_email || "—").full}>
+                          {truncateWithTitle(tx.user_email || tx.buyer_email || tx.seller_email || "—").short}
+                        </TableCell>
+                        <TableCell className="capitalize">{displayType(tx.transaction_type)}</TableCell>
+                        <TableCell title={truncateWithTitle(tx.item_name || tx.order_number || "—").full}>
+                          {truncateWithTitle(tx.item_name || tx.order_number || "—").short}
+                        </TableCell>
+                        <TableCell>{new Date(tx.payment_date || tx.created_at).toLocaleString()}</TableCell>
+                        <TableCell className="capitalize">{tx.status || "—"}</TableCell>
                         <TableCell className="text-right">{formatCurrency(tx.amount)}</TableCell>
+                        <TableCell className="text-right">
+                          <Button size="sm" variant="outline" onClick={() => openInvoice(tx)}>Invoice</Button>
+                        </TableCell>
                       </TableRow>
                     ))
                   )}
                 </TableBody>
               </Table>
+              </div>
             </div>
+          </DialogContent>
+        </Dialog>
+        <Dialog open={invoiceOpen} onOpenChange={setInvoiceOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Transaction Invoice</DialogTitle>
+            </DialogHeader>
+            {selectedTransaction ? (
+              <div className="space-y-2 text-sm">
+                <div><span className="font-medium">Transaction ID:</span> {selectedTransaction.id}</div>
+                <div><span className="font-medium">User:</span> {selectedTransaction.user_name || selectedTransaction.buyer_name || selectedTransaction.seller_name || "—"}</div>
+                <div><span className="font-medium">Email:</span> {selectedTransaction.user_email || selectedTransaction.buyer_email || selectedTransaction.seller_email || "—"}</div>
+                <div><span className="font-medium">Type:</span> {selectedTransaction.transaction_type}</div>
+                <div><span className="font-medium">Item:</span> {selectedTransaction.item_name || selectedTransaction.order_number || "—"}</div>
+                <div><span className="font-medium">Amount:</span> {formatCurrency(selectedTransaction.amount)}</div>
+                <div><span className="font-medium">Payment Date:</span> {new Date(selectedTransaction.payment_date || selectedTransaction.created_at).toLocaleString()}</div>
+                <div><span className="font-medium">Status:</span> {selectedTransaction.status || "—"}</div>
+                <div><span className="font-medium">Order #:</span> {selectedTransaction.order_number || "—"}</div>
+                <div><span className="font-medium">Reference:</span> {selectedTransaction.payment_intent_id || selectedTransaction.stripe_session_id || "—"}</div>
+              </div>
+            ) : null}
           </DialogContent>
         </Dialog>
         <ConfirmActionDialog
