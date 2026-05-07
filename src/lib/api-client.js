@@ -500,6 +500,21 @@ class ApiClient {
     return response.data;
   }
 
+  async getIntegrationSettings() {
+    const response = await this.client.get("/settings");
+    return response.data;
+  }
+
+  async updateIntegrationSettings(data) {
+    const response = await this.client.put("/settings", data);
+    return response.data;
+  }
+
+  async sendIntegrationTestEmail(to_email) {
+    const response = await this.client.post("/settings/test-email", { to_email });
+    return response.data;
+  }
+
   // ============ MODERATORS ENDPOINTS ============
   async getModerators(params) {
     const response = await this.client.get("/moderators", { params });

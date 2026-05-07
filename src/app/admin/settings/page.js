@@ -26,6 +26,11 @@ function Settings() {
   const [showResendApiKey, setShowResendApiKey] = useState(false);
   const [showSendgridApiKey, setShowSendgridApiKey] = useState(false);
   const [showMailgunApiKey, setShowMailgunApiKey] = useState(false);
+  const [showStripeSecretKey, setShowStripeSecretKey] = useState(false);
+  const [showStripeWebhookSecret, setShowStripeWebhookSecret] = useState(false);
+  const [showEasyparcelClientSecret, setShowEasyparcelClientSecret] = useState(false);
+  const [showEasyparcelEncryptionKey, setShowEasyparcelEncryptionKey] = useState(false);
+  const [showGoogleClientSecret, setShowGoogleClientSecret] = useState(false);
   
   // Password reset states
   const [currentPassword, setCurrentPassword] = useState("");
@@ -46,6 +51,28 @@ function Settings() {
     seller_stripe_fee_percentage: "",
   });
   const [isSavingPlatformFees, setIsSavingPlatformFees] = useState(false);
+  const [isSavingIntegrations, setIsSavingIntegrations] = useState(false);
+  const [integrationSettings, setIntegrationSettings] = useState({
+    stripe_publish_key: "",
+    stripe_secret_key: "",
+    stripe_webhook_secret: "",
+    easyparcel_client_id: "",
+    easyparcel_client_secret: "",
+    easyparcel_auth_url: "https://api.easyparcel.com/oauth/login",
+    easyparcel_token_url: "https://api.easyparcel.com/oauth/token",
+    easyparcel_api_base_url: "https://api.easyparcel.com",
+    easyparcel_redirect_uri: "",
+    easyparcel_encryption_key: "",
+    smtp_host: "",
+    smtp_port: 587,
+    smtp_user: "",
+    smtp_password: "",
+    smtp_tls: true,
+    email_from_name: "Driptyard",
+    email_from_address: "noreply@driptyard.com",
+    google_client_id: "",
+    google_client_secret: "",
+  });
   const [promoForm, setPromoForm] = useState({
     code: "",
     discount_type: "percentage",
@@ -70,6 +97,14 @@ function Settings() {
 
   useEffect(() => {
     loadPromoCodes();
+    const loadIntegrationSettings = async () => {
+      try {
+        const config = await apiClient.getIntegrationSettings();
+        setIntegrationSettings((prev) => ({ ...prev, ...config }));
+      } catch (error) {
+        notifyError(error?.response?.data?.message || "Failed to load integration settings.");
+      }
+    };
     const loadPlatformFees = async () => {
       try {
         const fees = await apiClient.getPlatformFees();
@@ -83,14 +118,32 @@ function Settings() {
       }
     };
     loadPlatformFees();
+    loadIntegrationSettings();
   }, []);
 
-  const handleTestEmail = () => {
-    notifySuccess(`A test email has been sent to ${testEmail}`);
+  const handleTestEmail = async () => {
+    if (!testEmail) {
+      notifyError("Please enter a test email address.");
+      return;
+    }
+    try {
+      await apiClient.sendIntegrationTestEmail(testEmail);
+      notifySuccess(`A test email has been sent to ${testEmail}`);
+    } catch (error) {
+      notifyError(error?.response?.data?.message || "Failed to send test email.");
+    }
   };
 
-  const handleSaveEmailSettings = () => {
-    notifySuccess("Your email configuration has been updated successfully.");
+  const handleSaveIntegrations = async () => {
+    setIsSavingIntegrations(true);
+    try {
+      await apiClient.updateIntegrationSettings(integrationSettings);
+      notifySuccess("Integration settings have been updated successfully.");
+    } catch (error) {
+      notifyError(error?.response?.data?.message || "Failed to update integration settings.");
+    } finally {
+      setIsSavingIntegrations(false);
+    }
   };
 
   const handleChangePassword = async () => {
@@ -414,6 +467,111 @@ function Settings() {
         </Card>
         <Card>
           <CardHeader className="pb-4">
+            <CardTitle>Google OAuth Configuration</CardTitle>
+            <CardDescription>
+              Configure Google login credentials used by backend authentication.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="google-client-id">Google Client ID</Label>
+                <Input
+                  id="google-client-id"
+                  value={integrationSettings.google_client_id || ""}
+                  onChange={(e) => setIntegrationSettings((prev) => ({ ...prev, google_client_id: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="google-client-secret">Google Client Secret</Label>
+                <div className="relative">
+                  <Input
+                    id="google-client-secret"
+                    type={showGoogleClientSecret ? "text" : "password"}
+                    className="pr-10"
+                    value={integrationSettings.google_client_secret || ""}
+                    onChange={(e) => setIntegrationSettings((prev) => ({ ...prev, google_client_secret: e.target.value }))}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowGoogleClientSecret(!showGoogleClientSecret)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {showGoogleClientSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+            </div>
+            <Button onClick={handleSaveIntegrations} disabled={isSavingIntegrations} className="gradient-driptyard-hover text-white shadow-md">
+              {isSavingIntegrations ? "Saving..." : "Save Google Settings"}
+            </Button>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-4">
+            <CardTitle>Stripe & EasyParcel Configuration</CardTitle>
+            <CardDescription>
+              Configure live credentials used by checkout, webhook, and EasyParcel APIs.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="stripe-publish-key">Stripe Publishable Key</Label>
+                <Input id="stripe-publish-key" value={integrationSettings.stripe_publish_key || ""} onChange={(e) => setIntegrationSettings((prev) => ({ ...prev, stripe_publish_key: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="stripe-secret-key">Stripe Secret Key</Label>
+                <div className="relative">
+                  <Input id="stripe-secret-key" type={showStripeSecretKey ? "text" : "password"} className="pr-10" value={integrationSettings.stripe_secret_key || ""} onChange={(e) => setIntegrationSettings((prev) => ({ ...prev, stripe_secret_key: e.target.value }))} />
+                  <button type="button" onClick={() => setShowStripeSecretKey(!showStripeSecretKey)} className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">{showStripeSecretKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="stripe-webhook-secret">Stripe Webhook Secret</Label>
+                <div className="relative">
+                  <Input id="stripe-webhook-secret" type={showStripeWebhookSecret ? "text" : "password"} className="pr-10" value={integrationSettings.stripe_webhook_secret || ""} onChange={(e) => setIntegrationSettings((prev) => ({ ...prev, stripe_webhook_secret: e.target.value }))} />
+                  <button type="button" onClick={() => setShowStripeWebhookSecret(!showStripeWebhookSecret)} className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">{showStripeWebhookSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ep-client-id">EasyParcel Client ID</Label>
+                <Input id="ep-client-id" value={integrationSettings.easyparcel_client_id || ""} onChange={(e) => setIntegrationSettings((prev) => ({ ...prev, easyparcel_client_id: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ep-client-secret">EasyParcel Client Secret</Label>
+                <div className="relative">
+                  <Input id="ep-client-secret" type={showEasyparcelClientSecret ? "text" : "password"} className="pr-10" value={integrationSettings.easyparcel_client_secret || ""} onChange={(e) => setIntegrationSettings((prev) => ({ ...prev, easyparcel_client_secret: e.target.value }))} />
+                  <button type="button" onClick={() => setShowEasyparcelClientSecret(!showEasyparcelClientSecret)} className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">{showEasyparcelClientSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ep-redirect-uri">EasyParcel Redirect URI</Label>
+                <Input id="ep-redirect-uri" value={integrationSettings.easyparcel_redirect_uri || ""} onChange={(e) => setIntegrationSettings((prev) => ({ ...prev, easyparcel_redirect_uri: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ep-token-url">EasyParcel Token URL</Label>
+                <Input id="ep-token-url" value={integrationSettings.easyparcel_token_url || ""} onChange={(e) => setIntegrationSettings((prev) => ({ ...prev, easyparcel_token_url: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ep-api-base-url">EasyParcel API Base URL</Label>
+                <Input id="ep-api-base-url" value={integrationSettings.easyparcel_api_base_url || ""} onChange={(e) => setIntegrationSettings((prev) => ({ ...prev, easyparcel_api_base_url: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ep-encryption-key">EasyParcel Encryption Key</Label>
+                <div className="relative">
+                  <Input id="ep-encryption-key" type={showEasyparcelEncryptionKey ? "text" : "password"} className="pr-10" value={integrationSettings.easyparcel_encryption_key || ""} onChange={(e) => setIntegrationSettings((prev) => ({ ...prev, easyparcel_encryption_key: e.target.value }))} />
+                  <button type="button" onClick={() => setShowEasyparcelEncryptionKey(!showEasyparcelEncryptionKey)} className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">{showEasyparcelEncryptionKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
+                </div>
+              </div>
+            </div>
+            <Button onClick={handleSaveIntegrations} disabled={isSavingIntegrations} className="gradient-driptyard-hover text-white shadow-md">
+              {isSavingIntegrations ? "Saving..." : "Save Stripe & EasyParcel"}
+            </Button>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-4">
             <CardTitle className="flex items-center gap-2">
               <Mail className="h-5 w-5" />
               Email Configuration
@@ -448,7 +606,7 @@ function Settings() {
                   {emailProvider === "smtp" && (
                     <div className="space-y-2">
                       <Label htmlFor="smtp-host">SMTP Host</Label>
-                      <Input id="smtp-host" placeholder="smtp.gmail.com" />
+                      <Input id="smtp-host" placeholder="smtp.gmail.com" value={integrationSettings.smtp_host || ""} onChange={(e) => setIntegrationSettings((prev) => ({ ...prev, smtp_host: e.target.value }))} />
                     </div>
                   )}
                 </div>
@@ -457,11 +615,11 @@ function Settings() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="smtp-port">SMTP Port</Label>
-                        <Input id="smtp-port" type="number" placeholder="587" />
+                        <Input id="smtp-port" type="number" placeholder="587" value={integrationSettings.smtp_port || ""} onChange={(e) => setIntegrationSettings((prev) => ({ ...prev, smtp_port: Number(e.target.value || 0) }))} />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="smtp-encryption">Encryption</Label>
-                        <Select defaultValue="tls">
+                        <Select value={integrationSettings.smtp_tls ? "tls" : "ssl"} onValueChange={(value) => setIntegrationSettings((prev) => ({ ...prev, smtp_tls: value === "tls" }))}>
                           <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
@@ -476,7 +634,7 @@ function Settings() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="smtp-username">SMTP Username</Label>
-                        <Input id="smtp-username" type="email" placeholder="your-email@example.com" />
+                        <Input id="smtp-username" type="email" placeholder="your-email@example.com" value={integrationSettings.smtp_user || ""} onChange={(e) => setIntegrationSettings((prev) => ({ ...prev, smtp_user: e.target.value }))} />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="smtp-password">SMTP Password</Label>
@@ -486,6 +644,8 @@ function Settings() {
                             type={showSmtpPassword ? "text" : "password"} 
                             placeholder="••••••••" 
                             className="pr-10"
+                            value={integrationSettings.smtp_password || ""}
+                            onChange={(e) => setIntegrationSettings((prev) => ({ ...prev, smtp_password: e.target.value }))}
                           />
                           <button
                             type="button"
@@ -593,11 +753,11 @@ function Settings() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="from-name">From Name</Label>
-                    <Input id="from-name" placeholder="DRIPTYARD" defaultValue="DRIPTYARD" />
+                    <Input id="from-name" placeholder="DRIPTYARD" value={integrationSettings.email_from_name || ""} onChange={(e) => setIntegrationSettings((prev) => ({ ...prev, email_from_name: e.target.value }))} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="from-email">From Email</Label>
-                    <Input id="from-email" type="email" placeholder="noreply@driptyard.com" />
+                    <Input id="from-email" type="email" placeholder="noreply@driptyard.com" value={integrationSettings.email_from_address || ""} onChange={(e) => setIntegrationSettings((prev) => ({ ...prev, email_from_address: e.target.value }))} />
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -626,7 +786,7 @@ function Settings() {
                     Send a test email to verify your configuration
                   </p>
                 </div>
-                <Button onClick={handleSaveEmailSettings} className="gradient-driptyard-hover text-white shadow-md w-full">
+                <Button onClick={handleSaveIntegrations} disabled={isSavingIntegrations} className="gradient-driptyard-hover text-white shadow-md w-full">
                   <CheckCircle className="h-4 w-4 mr-2" />
                   Save Email Settings
                 </Button>
