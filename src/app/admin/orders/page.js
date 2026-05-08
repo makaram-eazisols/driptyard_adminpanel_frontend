@@ -312,16 +312,52 @@ function Orders() {
     return productId ? `${baseUrl}/${productId}` : null;
   };
 
+  const getOrderFinancials = (order) => {
+    const totalAmount = Number(order?.total_amount ?? order?.total ?? 0);
+    const platformFees = Number(order?.seller_platform_fee ?? order?.driptyard_fee ?? 0);
+    const stripeFees = Number(order?.stripe_fee || 0);
+    const promoDiscount = Number(order?.discount_amount || 0);
+    const basePayableAmount = (totalAmount - stripeFees - platformFees) + promoDiscount;
+
+    const spotlightPackageCode = String(order?.spotlight_package_code || "").toLowerCase();
+    const isSpotlightPackage = spotlightPackageCode === "spotlight";
+    const spotlightCommissionRate = Number(order?.spotlight_commission_rate || 2);
+    const spotlightCommissionAmountApplied = Number(order?.spotlight_commission_amount || 0);
+    const spotlightCommissionEstimated = (totalAmount * spotlightCommissionRate) / 100;
+    const spotlightCommissionAmount = isSpotlightPackage
+      ? (order?.spotlight_commission_applied ? spotlightCommissionAmountApplied : spotlightCommissionEstimated)
+      : 0;
+    const payableAmountAfterCommission = basePayableAmount - spotlightCommissionAmount;
+
+    return {
+      totalAmount,
+      platformFees,
+      stripeFees,
+      promoDiscount,
+      basePayableAmount,
+      isSpotlightPackage,
+      spotlightCommissionRate,
+      spotlightCommissionAmount,
+      payableAmountAfterCommission,
+    };
+  };
+
   const orderDetailFields = (order) => {
     if (!order) return [];
     const productTitle = order.product_details?.title;
-    const totalAmount = Number(order.total_amount ?? order.total ?? 0);
     const shippingCost = Number(order.shipping_cost || 0);
     const buyerPlatformFee = Number(order.buyer_platform_fee || 0);
-    const sellerPlatformFee = Number(order.seller_platform_fee || order.driptyard_fee || 0);
-    const stripeFee = Number(order.stripe_fee || 0);
-    const promoDiscount = Number(order.discount_amount || 0);
-    const payableAmount = (totalAmount - stripeFee - sellerPlatformFee) + promoDiscount;
+    const {
+      totalAmount,
+      platformFees,
+      stripeFees,
+      promoDiscount,
+      basePayableAmount,
+      isSpotlightPackage,
+      spotlightCommissionRate,
+      spotlightCommissionAmount,
+      payableAmountAfterCommission,
+    } = getOrderFinancials(order);
     const rows = [
       { label: "Order #", value: order.order_number },
       { label: "Order ID", value: order.id },
@@ -332,11 +368,16 @@ function Orders() {
       { label: "Quantity", value: order.quantity },
       { label: "Shipping Cost", value: formatCurrency(shippingCost) },
       { label: "Buyer Platform Fee", value: formatCurrency(buyerPlatformFee) },
-      { label: "Seller Platform Fee", value: formatCurrency(sellerPlatformFee) },
-      { label: "Stripe Fee (Seller)", value: formatCurrency(stripeFee) },
+      { label: "Seller Platform Fee", value: formatCurrency(platformFees) },
+      { label: "Stripe Fee (Seller)", value: formatCurrency(stripeFees) },
       { label: "Promo Code", value: order.promo_code ?? "—" },
       { label: "Promo Discount", value: formatCurrency(promoDiscount) },
-      { label: "Payable Amount", value: formatCurrency(payableAmount) },
+      { label: "Payable Amount (before spotlight commission)", value: formatCurrency(basePayableAmount) },
+      { label: "Spotlight package", value: order.spotlight_package_code ?? "—" },
+      { label: "Spotlight commission rate", value: isSpotlightPackage ? `${spotlightCommissionRate}%` : "—" },
+      { label: "Spotlight commission amount", value: isSpotlightPackage ? formatCurrency(spotlightCommissionAmount) : "—" },
+      { label: "Spotlight commission applied", value: order.spotlight_commission_applied ? "Yes" : "No" },
+      { label: "Payable Amount (after spotlight commission)", value: formatCurrency(payableAmountAfterCommission) },
       { label: "Status", value: order.status },
       { label: "Payment status", value: order.payment_status ?? "—" },
       { label: "Escrow status", value: order.escrow_status ?? "—" },
@@ -484,14 +525,19 @@ function Orders() {
                         <TableCell>{new Date(order.created_at).toLocaleDateString()}</TableCell>
                         <TableCell>
                           {(() => {
-                            const totalAmount = Number(order.total_amount ?? order.total ?? 0);
-                            const platformFees = Number(order.seller_platform_fee ?? order.driptyard_fee ?? 0);
-                            const stripeFees = Number(order.stripe_fee || 0);
-                            const promoDiscount = Number(order.discount_amount || 0);
-                            const payableAmount = (totalAmount - stripeFees - platformFees) + promoDiscount;
+                            const {
+                              totalAmount,
+                              platformFees,
+                              stripeFees,
+                              promoDiscount,
+                              isSpotlightPackage,
+                              spotlightCommissionRate,
+                              spotlightCommissionAmount,
+                              payableAmountAfterCommission,
+                            } = getOrderFinancials(order);
                             return (
                           <div className="flex flex-col gap-0.5 text-xs">
-                            <span className="font-semibold text-sm">{formatCurrency(totalAmount)}</span>
+                            <span className="font-semibold text-sm">{formatCurrency(payableAmountAfterCommission)}</span>
                             <span className="text-muted-foreground">
                               Total Amount: {formatCurrency(totalAmount)}
                             </span>
@@ -506,8 +552,13 @@ function Orders() {
                                 Promo Discount{order.promo_code ? ` (${order.promo_code})` : ""}: +{formatCurrency(promoDiscount)}
                               </span>
                             )}
+                            {isSpotlightPackage && (
+                              <span className="text-muted-foreground">
+                                Spotlight Commission ({spotlightCommissionRate}%): -{formatCurrency(spotlightCommissionAmount)}
+                              </span>
+                            )}
                             <span className="text-muted-foreground">
-                              Payable Amount: {formatCurrency(payableAmount)}
+                              Payable Amount: {formatCurrency(payableAmountAfterCommission)}
                             </span>
                           </div>
                             );
@@ -547,6 +598,15 @@ function Orders() {
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-col gap-1">
+                            {(() => {
+                              const { isSpotlightPackage, spotlightCommissionAmount } = getOrderFinancials(order);
+                              if (!isSpotlightPackage) return null;
+                              return (
+                                <span className="text-[10px] text-amber-600">
+                                  Spotlight commission: {formatCurrency(spotlightCommissionAmount)} ({order.spotlight_commission_applied ? "applied" : "pending"})
+                                </span>
+                              );
+                            })()}
                             <Badge variant={order.payout_status === 'PAID_OUT' ? 'success' : 'outline'}>
                               {order.payout_status}
                             </Badge>

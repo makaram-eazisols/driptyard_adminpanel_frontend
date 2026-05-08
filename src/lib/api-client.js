@@ -573,6 +573,25 @@ class ApiClient {
     await this.client.delete(`/admin/membership-catalog/points-cards/${cardId}`);
   }
 
+  async getBumpPackages() {
+    const response = await this.client.get("/admin/bump-packages");
+    return response.data;
+  }
+
+  async createBumpPackage(data) {
+    const response = await this.client.post("/admin/bump-packages", data);
+    return response.data;
+  }
+
+  async updateBumpPackage(packageId, data) {
+    const response = await this.client.put(`/admin/bump-packages/${packageId}`, data);
+    return response.data;
+  }
+
+  async deleteBumpPackage(packageId) {
+    await this.client.delete(`/admin/bump-packages/${packageId}`);
+  }
+
   // ============ MODERATORS ENDPOINTS ============
   async getModerators(params) {
     const response = await this.client.get("/moderators", { params });

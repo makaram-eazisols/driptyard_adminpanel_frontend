@@ -62,6 +62,21 @@ function Settings() {
     seller_stripe_fee_percentage: "",
   });
   const [isSavingPlatformFees, setIsSavingPlatformFees] = useState(false);
+  const [bumpPackages, setBumpPackages] = useState([]);
+  const [isSavingBumpPackage, setIsSavingBumpPackage] = useState(false);
+  const [editingBumpPackageId, setEditingBumpPackageId] = useState(null);
+  const [bumpPackageForm, setBumpPackageForm] = useState({
+    code: "basic",
+    name: "Basic Plan",
+    package_type: "basic",
+    is_enabled: true,
+    points_cost: "20",
+    points_per_day: "",
+    max_days: "",
+    fixed_duration_hours: "24",
+    applies_until_sold: false,
+    default_region_country: "MY",
+  });
   const [isSavingIntegrations, setIsSavingIntegrations] = useState(false);
   const [integrationSettings, setIntegrationSettings] = useState({
     stripe_publish_key: "",
@@ -142,9 +157,64 @@ function Settings() {
         notifyError(error?.response?.data?.message || "Failed to load platform fee settings.");
       }
     };
+    const loadBumpPackages = async () => {
+      try {
+        const data = await apiClient.getBumpPackages();
+        setBumpPackages(Array.isArray(data) ? data : []);
+      } catch (error) {
+        notifyError(error?.response?.data?.message || "Failed to load bump packages.");
+      }
+    };
     loadPlatformFees();
+    loadBumpPackages();
     loadIntegrationSettings();
   }, []);
+
+  const handleSaveBumpPackage = async () => {
+    setIsSavingBumpPackage(true);
+    try {
+      const payload = {
+        ...bumpPackageForm,
+        points_cost: bumpPackageForm.points_cost ? Number(bumpPackageForm.points_cost) : null,
+        points_per_day: bumpPackageForm.points_per_day ? Number(bumpPackageForm.points_per_day) : null,
+        max_days: bumpPackageForm.max_days ? Number(bumpPackageForm.max_days) : null,
+        fixed_duration_hours: bumpPackageForm.fixed_duration_hours ? Number(bumpPackageForm.fixed_duration_hours) : null,
+      };
+      if (editingBumpPackageId) {
+        await apiClient.updateBumpPackage(editingBumpPackageId, payload);
+        notifySuccess("Bump package updated.");
+      } else {
+        await apiClient.createBumpPackage(payload);
+        notifySuccess("Bump package created.");
+      }
+      const data = await apiClient.getBumpPackages();
+      setBumpPackages(Array.isArray(data) ? data : []);
+      setEditingBumpPackageId(null);
+    } catch (error) {
+      notifyError(error?.response?.data?.message || "Failed to save bump package.");
+    } finally {
+      setIsSavingBumpPackage(false);
+    }
+  };
+
+  const handleToggleBumpPackage = async (pkg) => {
+    try {
+      await apiClient.updateBumpPackage(pkg.id, { is_enabled: !pkg.is_enabled });
+      const data = await apiClient.getBumpPackages();
+      setBumpPackages(Array.isArray(data) ? data : []);
+    } catch (error) {
+      notifyError(error?.response?.data?.message || "Failed to update bump package.");
+    }
+  };
+
+  const handleDeleteBumpPackage = async (pkg) => {
+    try {
+      await apiClient.deleteBumpPackage(pkg.id);
+      setBumpPackages((prev) => prev.filter((item) => item.id !== pkg.id));
+    } catch (error) {
+      notifyError(error?.response?.data?.message || "Failed to delete bump package.");
+    }
+  };
 
   const resetEducationalTipForm = () => {
     setEducationalTipForm({
@@ -563,6 +633,74 @@ function Settings() {
                 </>
               )}
             </Button>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Bump Package Settings</CardTitle>
+            <CardDescription>Create and manage seller bump package plans.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label>Code</Label>
+                <Input value={bumpPackageForm.code} onChange={(e) => setBumpPackageForm((prev) => ({ ...prev, code: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label>Name</Label>
+                <Input value={bumpPackageForm.name} onChange={(e) => setBumpPackageForm((prev) => ({ ...prev, name: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label>Type</Label>
+                <Select value={bumpPackageForm.package_type} onValueChange={(value) => setBumpPackageForm((prev) => ({ ...prev, package_type: value }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="basic">Basic</SelectItem>
+                    <SelectItem value="daily">Daily</SelectItem>
+                    <SelectItem value="spotlight">Spotlight</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="space-y-2"><Label>Points Cost</Label><Input type="number" value={bumpPackageForm.points_cost} onChange={(e) => setBumpPackageForm((prev) => ({ ...prev, points_cost: e.target.value }))} /></div>
+              <div className="space-y-2"><Label>Points/Day</Label><Input type="number" value={bumpPackageForm.points_per_day} onChange={(e) => setBumpPackageForm((prev) => ({ ...prev, points_per_day: e.target.value }))} /></div>
+              <div className="space-y-2"><Label>Max Days</Label><Input type="number" value={bumpPackageForm.max_days} onChange={(e) => setBumpPackageForm((prev) => ({ ...prev, max_days: e.target.value }))} /></div>
+              <div className="space-y-2"><Label>Duration Hours</Label><Input type="number" value={bumpPackageForm.fixed_duration_hours} onChange={(e) => setBumpPackageForm((prev) => ({ ...prev, fixed_duration_hours: e.target.value }))} /></div>
+            </div>
+            <Button onClick={handleSaveBumpPackage} disabled={isSavingBumpPackage} className="gradient-driptyard-hover text-white shadow-md">
+              {isSavingBumpPackage ? "Saving..." : editingBumpPackageId ? "Update Bump Package" : "Create Bump Package"}
+            </Button>
+            <Separator />
+            <div className="space-y-2">
+              {bumpPackages.map((pkg) => (
+                <div key={pkg.id} className="border border-border rounded-md p-3 flex items-center justify-between">
+                  <div className="text-sm">
+                    <p className="font-semibold">{pkg.name} ({pkg.code})</p>
+                    <p className="text-muted-foreground">{pkg.package_type} • {pkg.is_enabled ? "Enabled" : "Disabled"}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={() => {
+                      setEditingBumpPackageId(pkg.id);
+                      setBumpPackageForm({
+                        code: pkg.code || "",
+                        name: pkg.name || "",
+                        package_type: pkg.package_type || "basic",
+                        is_enabled: !!pkg.is_enabled,
+                        points_cost: pkg.points_cost ?? "",
+                        points_per_day: pkg.points_per_day ?? "",
+                        max_days: pkg.max_days ?? "",
+                        fixed_duration_hours: pkg.fixed_duration_hours ?? "",
+                        applies_until_sold: !!pkg.applies_until_sold,
+                        default_region_country: pkg.default_region_country || "MY",
+                      });
+                    }}>Edit</Button>
+                    <Button variant="outline" size="sm" onClick={() => handleToggleBumpPackage(pkg)}>{pkg.is_enabled ? "Disable" : "Enable"}</Button>
+                    <Button variant="destructive" size="sm" onClick={() => handleDeleteBumpPackage(pkg)}>Delete</Button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
         <Card>
