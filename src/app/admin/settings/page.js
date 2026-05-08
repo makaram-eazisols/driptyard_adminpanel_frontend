@@ -477,6 +477,18 @@ function Settings() {
           <h1 className="text-3xl font-bold text-secondary">Settings</h1>
           <p className="text-muted-foreground mt-1">Manage your store settings</p>
         </div>
+        <Tabs defaultValue="settings" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)] gap-6 items-start">
+            <TabsList className="h-fit w-full flex flex-col items-stretch bg-muted/40 p-1">
+              <TabsTrigger value="settings" className="w-full justify-start">
+                Settings
+              </TabsTrigger>
+              <TabsTrigger value="manage-packages" className="w-full justify-start">
+                Manage Packages
+              </TabsTrigger>
+            </TabsList>
+            <div>
+              <TabsContent value="settings" className="mt-0 space-y-6">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="w-full">
           <CardHeader>
@@ -637,74 +649,6 @@ function Settings() {
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Bump Package Settings</CardTitle>
-            <CardDescription>Create and manage seller bump package plans.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label>Code</Label>
-                <Input value={bumpPackageForm.code} onChange={(e) => setBumpPackageForm((prev) => ({ ...prev, code: e.target.value }))} />
-              </div>
-              <div className="space-y-2">
-                <Label>Name</Label>
-                <Input value={bumpPackageForm.name} onChange={(e) => setBumpPackageForm((prev) => ({ ...prev, name: e.target.value }))} />
-              </div>
-              <div className="space-y-2">
-                <Label>Type</Label>
-                <Select value={bumpPackageForm.package_type} onValueChange={(value) => setBumpPackageForm((prev) => ({ ...prev, package_type: value }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="basic">Basic</SelectItem>
-                    <SelectItem value="daily">Daily</SelectItem>
-                    <SelectItem value="spotlight">Spotlight</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="space-y-2"><Label>Points Cost</Label><Input type="number" value={bumpPackageForm.points_cost} onChange={(e) => setBumpPackageForm((prev) => ({ ...prev, points_cost: e.target.value }))} /></div>
-              <div className="space-y-2"><Label>Points/Day</Label><Input type="number" value={bumpPackageForm.points_per_day} onChange={(e) => setBumpPackageForm((prev) => ({ ...prev, points_per_day: e.target.value }))} /></div>
-              <div className="space-y-2"><Label>Max Days</Label><Input type="number" value={bumpPackageForm.max_days} onChange={(e) => setBumpPackageForm((prev) => ({ ...prev, max_days: e.target.value }))} /></div>
-              <div className="space-y-2"><Label>Duration Hours</Label><Input type="number" value={bumpPackageForm.fixed_duration_hours} onChange={(e) => setBumpPackageForm((prev) => ({ ...prev, fixed_duration_hours: e.target.value }))} /></div>
-            </div>
-            <Button onClick={handleSaveBumpPackage} disabled={isSavingBumpPackage} className="gradient-driptyard-hover text-white shadow-md">
-              {isSavingBumpPackage ? "Saving..." : editingBumpPackageId ? "Update Bump Package" : "Create Bump Package"}
-            </Button>
-            <Separator />
-            <div className="space-y-2">
-              {bumpPackages.map((pkg) => (
-                <div key={pkg.id} className="border border-border rounded-md p-3 flex items-center justify-between">
-                  <div className="text-sm">
-                    <p className="font-semibold">{pkg.name} ({pkg.code})</p>
-                    <p className="text-muted-foreground">{pkg.package_type} • {pkg.is_enabled ? "Enabled" : "Disabled"}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={() => {
-                      setEditingBumpPackageId(pkg.id);
-                      setBumpPackageForm({
-                        code: pkg.code || "",
-                        name: pkg.name || "",
-                        package_type: pkg.package_type || "basic",
-                        is_enabled: !!pkg.is_enabled,
-                        points_cost: pkg.points_cost ?? "",
-                        points_per_day: pkg.points_per_day ?? "",
-                        max_days: pkg.max_days ?? "",
-                        fixed_duration_hours: pkg.fixed_duration_hours ?? "",
-                        applies_until_sold: !!pkg.applies_until_sold,
-                        default_region_country: pkg.default_region_country || "MY",
-                      });
-                    }}>Edit</Button>
-                    <Button variant="outline" size="sm" onClick={() => handleToggleBumpPackage(pkg)}>{pkg.is_enabled ? "Disable" : "Enable"}</Button>
-                    <Button variant="destructive" size="sm" onClick={() => handleDeleteBumpPackage(pkg)}>Delete</Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
             <CardTitle>Educational Tips</CardTitle>
             <CardDescription>
               Manage in-app educational notifications shown to users.
@@ -792,7 +736,6 @@ function Settings() {
             </div>
           </CardContent>
         </Card>
-        <MembershipSettingsSection />
         <Card>
           <CardHeader className="pb-4">
             <CardTitle>Google Maps Configuration</CardTitle>
@@ -1536,6 +1479,81 @@ function Settings() {
             </Button>
           </CardContent>
         </Card> */}
+              </TabsContent>
+              <TabsContent value="manage-packages" className="mt-0 space-y-6">
+                <MembershipSettingsSection />
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Bump Package Settings</CardTitle>
+                    <CardDescription>Create and manage seller bump package plans.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <Label>Code</Label>
+                        <Input value={bumpPackageForm.code} onChange={(e) => setBumpPackageForm((prev) => ({ ...prev, code: e.target.value }))} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Name</Label>
+                        <Input value={bumpPackageForm.name} onChange={(e) => setBumpPackageForm((prev) => ({ ...prev, name: e.target.value }))} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Type</Label>
+                        <Select value={bumpPackageForm.package_type} onValueChange={(value) => setBumpPackageForm((prev) => ({ ...prev, package_type: value }))}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="basic">Basic</SelectItem>
+                            <SelectItem value="daily">Daily</SelectItem>
+                            <SelectItem value="spotlight">Spotlight</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <div className="space-y-2"><Label>Points Cost</Label><Input type="number" value={bumpPackageForm.points_cost} onChange={(e) => setBumpPackageForm((prev) => ({ ...prev, points_cost: e.target.value }))} /></div>
+                      <div className="space-y-2"><Label>Points/Day</Label><Input type="number" value={bumpPackageForm.points_per_day} onChange={(e) => setBumpPackageForm((prev) => ({ ...prev, points_per_day: e.target.value }))} /></div>
+                      <div className="space-y-2"><Label>Max Days</Label><Input type="number" value={bumpPackageForm.max_days} onChange={(e) => setBumpPackageForm((prev) => ({ ...prev, max_days: e.target.value }))} /></div>
+                      <div className="space-y-2"><Label>Duration Hours</Label><Input type="number" value={bumpPackageForm.fixed_duration_hours} onChange={(e) => setBumpPackageForm((prev) => ({ ...prev, fixed_duration_hours: e.target.value }))} /></div>
+                    </div>
+                    <Button onClick={handleSaveBumpPackage} disabled={isSavingBumpPackage} className="gradient-driptyard-hover text-white shadow-md">
+                      {isSavingBumpPackage ? "Saving..." : editingBumpPackageId ? "Update Bump Package" : "Create Bump Package"}
+                    </Button>
+                    <Separator />
+                    <div className="space-y-2">
+                      {bumpPackages.map((pkg) => (
+                        <div key={pkg.id} className="border border-border rounded-md p-3 flex items-center justify-between">
+                          <div className="text-sm">
+                            <p className="font-semibold">{pkg.name} ({pkg.code})</p>
+                            <p className="text-muted-foreground">{pkg.package_type} • {pkg.is_enabled ? "Enabled" : "Disabled"}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button variant="outline" size="sm" onClick={() => {
+                              setEditingBumpPackageId(pkg.id);
+                              setBumpPackageForm({
+                                code: pkg.code || "",
+                                name: pkg.name || "",
+                                package_type: pkg.package_type || "basic",
+                                is_enabled: !!pkg.is_enabled,
+                                points_cost: pkg.points_cost ?? "",
+                                points_per_day: pkg.points_per_day ?? "",
+                                max_days: pkg.max_days ?? "",
+                                fixed_duration_hours: pkg.fixed_duration_hours ?? "",
+                                applies_until_sold: !!pkg.applies_until_sold,
+                                default_region_country: pkg.default_region_country || "MY",
+                              });
+                            }}>Edit</Button>
+                            <Button variant="outline" size="sm" onClick={() => handleToggleBumpPackage(pkg)}>{pkg.is_enabled ? "Disable" : "Enable"}</Button>
+                            <Button variant="destructive" size="sm" onClick={() => handleDeleteBumpPackage(pkg)}>Delete</Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </div>
+          </div>
+        </Tabs>
       </div>
     </AdminLayout>
   );
