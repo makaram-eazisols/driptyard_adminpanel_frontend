@@ -18,6 +18,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { notifyError, notifySuccess } from "@/lib/toast";
 import { MembershipSettingsSection } from "@/components/admin/MembershipSettingsSection";
+import { ConfirmActionDialog } from "@/components/modals/ConfirmActionDialog";
 
 function Settings() {
   const { user } = useAuth();
@@ -65,6 +66,8 @@ function Settings() {
   const [bumpPackages, setBumpPackages] = useState([]);
   const [isSavingBumpPackage, setIsSavingBumpPackage] = useState(false);
   const [editingBumpPackageId, setEditingBumpPackageId] = useState(null);
+  const [isDeletingItem, setIsDeletingItem] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [bumpPackageForm, setBumpPackageForm] = useState({
     code: "basic",
     name: "Basic Plan",
@@ -208,11 +211,15 @@ function Settings() {
   };
 
   const handleDeleteBumpPackage = async (pkg) => {
+    setIsDeletingItem(true);
     try {
       await apiClient.deleteBumpPackage(pkg.id);
       setBumpPackages((prev) => prev.filter((item) => item.id !== pkg.id));
+      setDeleteTarget(null);
     } catch (error) {
       notifyError(error?.response?.data?.message || "Failed to delete bump package.");
+    } finally {
+      setIsDeletingItem(false);
     }
   };
 
@@ -268,16 +275,20 @@ function Settings() {
     });
   };
 
-  const handleDeleteEducationalTip = async (tipId) => {
+  const handleDeleteEducationalTip = async (tip) => {
+    setIsDeletingItem(true);
     try {
-      await apiClient.deleteEducationalTip(tipId);
+      await apiClient.deleteEducationalTip(tip.id);
       notifySuccess("Educational tip deleted.");
-      if (editingTipId === tipId) {
+      if (editingTipId === tip.id) {
         resetEducationalTipForm();
       }
       await loadEducationalTips();
+      setDeleteTarget(null);
     } catch (error) {
       notifyError(error?.response?.data?.message || "Failed to delete educational tip.");
+    } finally {
+      setIsDeletingItem(false);
     }
   };
 
@@ -485,6 +496,9 @@ function Settings() {
               </TabsTrigger>
               <TabsTrigger value="manage-packages" className="w-full justify-start">
                 Manage Packages
+              </TabsTrigger>
+              <TabsTrigger value="bump-package-settings" className="w-full justify-start">
+                Bump Package Settings
               </TabsTrigger>
             </TabsList>
             <div>
@@ -724,7 +738,11 @@ function Settings() {
                         <Button variant="outline" size="sm" onClick={() => handleToggleEducationalTipStatus(tip)}>
                           {tip.is_active ? "Disable" : "Enable"}
                         </Button>
-                        <Button variant="destructive" size="sm" onClick={() => handleDeleteEducationalTip(tip.id)}>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => setDeleteTarget({ type: "tip", item: tip })}
+                        >
                           <Trash2 className="h-3 w-3 mr-1" />
                           Delete
                         </Button>
@@ -1482,6 +1500,8 @@ function Settings() {
               </TabsContent>
               <TabsContent value="manage-packages" className="mt-0 space-y-6">
                 <MembershipSettingsSection />
+              </TabsContent>
+              <TabsContent value="bump-package-settings" className="mt-0 space-y-6">
                 <Card>
                   <CardHeader>
                     <CardTitle>Bump Package Settings</CardTitle>
@@ -1543,7 +1563,13 @@ function Settings() {
                               });
                             }}>Edit</Button>
                             <Button variant="outline" size="sm" onClick={() => handleToggleBumpPackage(pkg)}>{pkg.is_enabled ? "Disable" : "Enable"}</Button>
-                            <Button variant="destructive" size="sm" onClick={() => handleDeleteBumpPackage(pkg)}>Delete</Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => setDeleteTarget({ type: "bump-package", item: pkg })}
+                            >
+                              Delete
+                            </Button>
                           </div>
                         </div>
                       ))}
@@ -1554,6 +1580,31 @@ function Settings() {
             </div>
           </div>
         </Tabs>
+        <ConfirmActionDialog
+          open={!!deleteTarget}
+          onOpenChange={(open) => {
+            if (!open && !isDeletingItem) {
+              setDeleteTarget(null);
+            }
+          }}
+          title={deleteTarget?.type === "tip" ? "Delete educational tip?" : "Delete bump package?"}
+          description={
+            deleteTarget?.type === "tip"
+              ? `Delete "${deleteTarget?.item?.title || "this tip"}"?`
+              : `Delete bump package "${deleteTarget?.item?.name || "this package"}" (${deleteTarget?.item?.code || "-"})?`
+          }
+          confirmLabel="Delete"
+          confirmClassName="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          isLoading={isDeletingItem}
+          onConfirm={async () => {
+            if (!deleteTarget) return;
+            if (deleteTarget.type === "tip") {
+              await handleDeleteEducationalTip(deleteTarget.item);
+              return;
+            }
+            await handleDeleteBumpPackage(deleteTarget.item);
+          }}
+        />
       </div>
     </AdminLayout>
   );

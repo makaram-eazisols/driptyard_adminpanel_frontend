@@ -18,6 +18,7 @@ import {
 import { Crown, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import { notifyError, notifySuccess } from "@/lib/toast";
+import { ConfirmActionDialog } from "@/components/modals/ConfirmActionDialog";
 
 const MAX_PLANS = 3;
 const MAX_CARDS = 3;
@@ -52,6 +53,8 @@ export function MembershipSettingsSection() {
   const [editingCardId, setEditingCardId] = useState(null);
   const [planForm, setPlanForm] = useState(emptyPlanForm);
   const [cardForm, setCardForm] = useState(emptyCardForm);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deletingTarget, setDeletingTarget] = useState(false);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -176,13 +179,16 @@ export function MembershipSettingsSection() {
   };
 
   const handleDeletePlan = async (plan) => {
-    if (!confirm(`Delete membership plan “${plan.name}”? This cannot be undone if no users are on it.`)) return;
+    setDeletingTarget(true);
     try {
       await apiClient.deleteAdminMembershipPlan(plan.id);
       notifySuccess("Membership plan deleted.");
       await loadAll();
+      setDeleteTarget(null);
     } catch (error) {
       notifyError(error?.response?.data?.detail || "Failed to delete plan.");
+    } finally {
+      setDeletingTarget(false);
     }
   };
 
@@ -226,13 +232,16 @@ export function MembershipSettingsSection() {
   };
 
   const handleDeleteCard = async (card) => {
-    if (!confirm(`Delete points card ${card.points_amount} pts / S$${card.price}?`)) return;
+    setDeletingTarget(true);
     try {
       await apiClient.deleteAdminPointsCard(card.id);
       notifySuccess("Points card deleted.");
       await loadAll();
+      setDeleteTarget(null);
     } catch (error) {
       notifyError(error?.response?.data?.detail || "Failed to delete points card.");
+    } finally {
+      setDeletingTarget(false);
     }
   };
 
@@ -293,7 +302,11 @@ export function MembershipSettingsSection() {
                       <Pencil className="h-3 w-3 mr-1" />
                       Edit
                     </Button>
-                    <Button variant="destructive" size="sm" onClick={() => handleDeletePlan(plan)}>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => setDeleteTarget({ type: "plan", item: plan })}
+                    >
                       <Trash2 className="h-3 w-3 mr-1" />
                       Delete
                     </Button>
@@ -347,7 +360,11 @@ export function MembershipSettingsSection() {
                       <Pencil className="h-3 w-3 mr-1" />
                       Edit
                     </Button>
-                    <Button variant="destructive" size="sm" onClick={() => handleDeleteCard(card)}>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => setDeleteTarget({ type: "card", item: card })}
+                    >
                       <Trash2 className="h-3 w-3 mr-1" />
                       Delete
                     </Button>
@@ -492,6 +509,32 @@ export function MembershipSettingsSection() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmActionDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open && !deletingTarget) {
+            setDeleteTarget(null);
+          }
+        }}
+        title={deleteTarget?.type === "plan" ? "Delete membership plan?" : "Delete points card?"}
+        description={
+          deleteTarget?.type === "plan"
+            ? `Delete membership plan "${deleteTarget?.item?.name}"? This cannot be undone if no users are on it.`
+            : `Delete points card ${deleteTarget?.item?.points_amount} pts / S$${deleteTarget?.item?.price}?`
+        }
+        confirmLabel="Delete"
+        confirmClassName="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+        isLoading={deletingTarget}
+        onConfirm={async () => {
+          if (!deleteTarget) return;
+          if (deleteTarget.type === "plan") {
+            await handleDeletePlan(deleteTarget.item);
+            return;
+          }
+          await handleDeleteCard(deleteTarget.item);
+        }}
+      />
     </>
   );
 }

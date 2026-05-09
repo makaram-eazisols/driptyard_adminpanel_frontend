@@ -234,17 +234,21 @@ function Orders() {
     });
   };
 
-  const handleMarkRefundPaid = (orderId) => {
+  const handleMarkRefundPaid = (order) => {
+    const totalRefundAmount = formatCurrency(order?.total_amount ?? order?.total ?? 0);
+    const isCancelledOrder = String(order?.status || "").toUpperCase() === "CANCELLED";
     setConfirmDialog({
       open: true,
       title: "Mark refund paid?",
-      description: "Record that the refund has been paid to the buyer?",
+      description: isCancelledOrder
+        ? `This order is cancelled. Refund the full total amount ${totalRefundAmount} to the buyer and confirm once paid.`
+        : `Record that the refund amount ${totalRefundAmount} has been paid to the buyer?`,
       confirmLabel: "Mark Refund Paid",
       confirmClassName: "",
       onConfirm: async () => {
         setActionLoading(true);
         try {
-          await apiClient.markRefundPaid(orderId);
+          await apiClient.markRefundPaid(order.id);
           notifySuccess("Refund marked as paid");
           fetchOrders();
           setConfirmDialog((prev) => ({ ...prev, open: false }));
@@ -319,15 +323,17 @@ function Orders() {
     const promoDiscount = Number(order?.discount_amount || 0);
     const basePayableAmount = (totalAmount - stripeFees - platformFees) + promoDiscount;
 
-    const spotlightPackageCode = String(order?.spotlight_package_code || "").toLowerCase();
-    const isSpotlightPackage = spotlightPackageCode === "spotlight";
-    const spotlightCommissionRate = Number(order?.spotlight_commission_rate || 2);
-    const spotlightCommissionAmountApplied = Number(order?.spotlight_commission_amount || 0);
-    const spotlightCommissionEstimated = (totalAmount * spotlightCommissionRate) / 100;
-    const spotlightCommissionAmount = isSpotlightPackage
-      ? (order?.spotlight_commission_applied ? spotlightCommissionAmountApplied : spotlightCommissionEstimated)
+    const bumpPackageCode = String(order?.spotlight_package_code || "").toLowerCase();
+    // Center Stage Special carries a 2% platform commission deducted from seller payout.
+    // Spotlight Bump does not carry any commission (legacy "spotlight" records are not charged).
+    const isCenterStagePackage = bumpPackageCode === "center_stage";
+    const commissionRate = Number(order?.spotlight_commission_rate || 2);
+    const commissionAmountApplied = Number(order?.spotlight_commission_amount || 0);
+    const commissionEstimated = (totalAmount * commissionRate) / 100;
+    const commissionAmount = isCenterStagePackage
+      ? (order?.spotlight_commission_applied ? commissionAmountApplied : commissionEstimated)
       : 0;
-    const payableAmountAfterCommission = basePayableAmount - spotlightCommissionAmount;
+    const payableAmountAfterCommission = basePayableAmount - commissionAmount;
 
     return {
       totalAmount,
@@ -335,9 +341,10 @@ function Orders() {
       stripeFees,
       promoDiscount,
       basePayableAmount,
-      isSpotlightPackage,
-      spotlightCommissionRate,
-      spotlightCommissionAmount,
+      bumpPackageCode,
+      isCenterStagePackage,
+      commissionRate,
+      commissionAmount,
       payableAmountAfterCommission,
     };
   };
@@ -353,9 +360,10 @@ function Orders() {
       stripeFees,
       promoDiscount,
       basePayableAmount,
-      isSpotlightPackage,
-      spotlightCommissionRate,
-      spotlightCommissionAmount,
+      bumpPackageCode,
+      isCenterStagePackage,
+      commissionRate,
+      commissionAmount,
       payableAmountAfterCommission,
     } = getOrderFinancials(order);
     const rows = [
@@ -364,6 +372,7 @@ function Orders() {
       { label: "Product", value: productTitle ? `${productTitle} (ID: ${order.product_details.id})` : String(order.product_details.id) },
       { label: "Date", value: order.created_at ? new Date(order.created_at).toLocaleString() : "—" },
       { label: "Total Amount", value: formatCurrency(totalAmount) },
+      { label: "Refund amount to pay (cancelled order)", value: String(order.status || "").toUpperCase() === "CANCELLED" ? formatCurrency(totalAmount) : "—" },
       { label: "Unit price", value: formatCurrency(order.unit_price) },
       { label: "Quantity", value: order.quantity },
       { label: "Shipping Cost", value: formatCurrency(shippingCost) },
@@ -372,16 +381,23 @@ function Orders() {
       { label: "Stripe Fee (Seller)", value: formatCurrency(stripeFees) },
       { label: "Promo Code", value: order.promo_code ?? "—" },
       { label: "Promo Discount", value: formatCurrency(promoDiscount) },
-      { label: "Payable Amount (before spotlight commission)", value: formatCurrency(basePayableAmount) },
-      { label: "Spotlight package", value: order.spotlight_package_code ?? "—" },
-      { label: "Spotlight commission rate", value: isSpotlightPackage ? `${spotlightCommissionRate}%` : "—" },
-      { label: "Spotlight commission amount", value: isSpotlightPackage ? formatCurrency(spotlightCommissionAmount) : "—" },
-      { label: "Spotlight commission applied", value: order.spotlight_commission_applied ? "Yes" : "No" },
-      { label: "Payable Amount (after spotlight commission)", value: formatCurrency(payableAmountAfterCommission) },
+      { label: "Payable Amount (before commission)", value: formatCurrency(basePayableAmount) },
+      { label: "Bump package", value: order.spotlight_package_code ?? "—" },
+      { label: "Center Stage commission rate", value: isCenterStagePackage ? `${commissionRate}%` : "—" },
+      { label: "Center Stage commission amount", value: isCenterStagePackage ? formatCurrency(commissionAmount) : "—" },
+      { label: "Center Stage commission applied", value: isCenterStagePackage ? (order.spotlight_commission_applied ? "Yes" : "No") : "—" },
+      { label: "Payable Amount (after commission)", value: formatCurrency(payableAmountAfterCommission) },
       { label: "Status", value: order.status },
       { label: "Payment status", value: order.payment_status ?? "—" },
       { label: "Escrow status", value: order.escrow_status ?? "—" },
-      { label: "Payout status", value: order.payout_status ?? "—" },
+      {
+        label: "Payout status",
+        value: (() => {
+          const raw = order.payout_status ?? "—";
+          if (order.refund_status === "PAID" || raw === "REFUND_PAID") return "PAID (refund)";
+          return raw;
+        })(),
+      },
       { label: "Fulfillment", value: order.fulfillment_method ?? "—" },
       { label: "Meetup location", value: order.meetup_location ?? "—" },
       { label: "Shipping address", value: order.shipping_address ?? "—" },
@@ -530,14 +546,22 @@ function Orders() {
                               platformFees,
                               stripeFees,
                               promoDiscount,
-                              isSpotlightPackage,
-                              spotlightCommissionRate,
-                              spotlightCommissionAmount,
+                              isCenterStagePackage,
+                              commissionRate,
+                              commissionAmount,
                               payableAmountAfterCommission,
                             } = getOrderFinancials(order);
+                            const isCancelledOrder = String(order?.status || "").toUpperCase() === "CANCELLED";
                             return (
                           <div className="flex flex-col gap-0.5 text-xs">
-                            <span className="font-semibold text-sm">{formatCurrency(payableAmountAfterCommission)}</span>
+                            <span className="font-semibold text-sm">
+                              {isCancelledOrder ? formatCurrency(totalAmount) : formatCurrency(payableAmountAfterCommission)}
+                            </span>
+                            {isCancelledOrder && (
+                              <span className="text-destructive">
+                                Cancelled order refund amount: {formatCurrency(totalAmount)}
+                              </span>
+                            )}
                             <span className="text-muted-foreground">
                               Total Amount: {formatCurrency(totalAmount)}
                             </span>
@@ -552,9 +576,9 @@ function Orders() {
                                 Promo Discount{order.promo_code ? ` (${order.promo_code})` : ""}: +{formatCurrency(promoDiscount)}
                               </span>
                             )}
-                            {isSpotlightPackage && (
+                            {isCenterStagePackage && (
                               <span className="text-muted-foreground">
-                                Spotlight Commission ({spotlightCommissionRate}%): -{formatCurrency(spotlightCommissionAmount)}
+                                Center Stage Commission ({commissionRate}%): -{formatCurrency(commissionAmount)}
                               </span>
                             )}
                             <span className="text-muted-foreground">
@@ -599,26 +623,36 @@ function Orders() {
                         <TableCell>
                           <div className="flex flex-col gap-1">
                             {(() => {
-                              const { isSpotlightPackage, spotlightCommissionAmount } = getOrderFinancials(order);
-                              if (!isSpotlightPackage) return null;
+                              const { isCenterStagePackage, commissionAmount } = getOrderFinancials(order);
+                              if (!isCenterStagePackage) return null;
                               return (
                                 <span className="text-[10px] text-amber-600">
-                                  Spotlight commission: {formatCurrency(spotlightCommissionAmount)} ({order.spotlight_commission_applied ? "applied" : "pending"})
+                                  Center Stage commission: {formatCurrency(commissionAmount)} ({order.spotlight_commission_applied ? "applied" : "pending"})
                                 </span>
                               );
                             })()}
-                            <Badge variant={order.payout_status === 'PAID_OUT' ? 'success' : 'outline'}>
-                              {order.payout_status}
-                            </Badge>
+                            {(() => {
+                              const refundPaid =
+                                order.refund_status === "PAID" || order.payout_status === "REFUND_PAID";
+                              const sellerPaidOut = order.payout_status === "PAID_OUT";
+                              const label = refundPaid ? "PAID" : order.payout_status;
+                              const variant = refundPaid || sellerPaidOut ? "success" : "outline";
+                              return (
+                                <Badge variant={variant}>{label}</Badge>
+                              );
+                            })()}
                             {order.payout_requested && order.seller_bank_details && (
                               <span className="text-[10px] text-muted-foreground truncate max-w-[100px]" title={order.seller_bank_details}>
                                 Bank details provided
                               </span>
                             )}
-                            {order.refund_requested && (
+                            {order.refund_requested && order.refund_status !== "PAID" && (
                               <span className="text-[10px]" title={order.refund_reason}>
-                                Refund: {order.refund_status || 'REQUESTED'}
+                                Refund: {order.refund_status || "REQUESTED"}
                               </span>
+                            )}
+                            {order.refund_requested && order.refund_status === "PAID" && (
+                              <span className="text-[10px] text-muted-foreground">Refund completed</span>
                             )}
                           </div>
                         </TableCell>
@@ -635,7 +669,9 @@ function Orders() {
                             {order.payout_requested &&
                               order.buyer_confirmed_receipt &&
                               order.escrow_status !== 'RELEASED' &&
-                              order.payout_status !== 'PAID_OUT' && (
+                              order.payout_status !== 'PAID_OUT' &&
+                              order.refund_status !== 'PAID' &&
+                              order.payout_status !== 'REFUND_PAID' && (
                               <Button
                                 size="sm"
                                 onClick={() => handleReleasePayout(order.id)}
@@ -645,7 +681,10 @@ function Orders() {
                                 Release Payout
                               </Button>
                             )}
-                            {order.escrow_status === 'RELEASED' && order.payout_status !== 'PAID_OUT' && (
+                            {order.escrow_status === 'RELEASED' &&
+                              order.payout_status !== 'PAID_OUT' &&
+                              order.refund_status !== 'PAID' &&
+                              order.payout_status !== 'REFUND_PAID' && (
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -685,7 +724,7 @@ function Orders() {
                                     variant="outline"
                                     className="bg-accent text-accent-foreground"
                                     disabled={loading}
-                                    onClick={() => handleMarkRefundPaid(order.id)}
+                                    onClick={() => handleMarkRefundPaid(order)}
                                   >
                                     Mark Refund Paid
                                   </Button>
@@ -780,7 +819,7 @@ function Orders() {
                     size="sm"
                     className="bg-accent text-accent-foreground"
                     onClick={() => {
-                      handleMarkRefundPaid(detailsOrder.id);
+                      handleMarkRefundPaid(detailsOrder);
                       setDetailsOrder(null);
                     }}
                   >

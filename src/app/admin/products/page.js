@@ -5,6 +5,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Search, MoreVertical, Edit2, Trash2, Loader2, ChevronLeft, ChevronRight, Star, X, Filter, ExternalLink, Eye } from "lucide-react";
 import { format } from "date-fns";
 import { apiClient } from "@/lib/api-client";
@@ -46,6 +47,12 @@ const CONDITIONS = [
   { value: "Like New", label: "Like New" },
   { value: "Used", label: "Used" },
   { value: "Heavily Used", label: "Heavily Used" },
+];
+
+const STOCK_STATUSES = [
+  { value: "In Stock", label: "In Stock" },
+  { value: "Out of Stock", label: "Out of Stock" },
+  { value: "Limited", label: "Limited" },
 ];
 
 function Products() {
@@ -252,10 +259,32 @@ function Products() {
       setEditLoading(true);
       await apiClient.updateAdminProduct(editProduct.id, {
         title: editProduct.title,
+        description: editProduct.description || null,
         price: Number(editProduct.price) || 0,
         condition: editProduct.condition,
+        deal_method: editProduct.deal_method || null,
+        meetup_date: editProduct.meetup_date || null,
+        meetup_time: editProduct.meetup_time || null,
+        meetup_location: editProduct.meetup_location || null,
+        stock_quantity: Number(editProduct.stock_quantity ?? 0),
+        stock_status: editProduct.stock_status,
         is_active: editProduct.is_active,
+        is_sold: !!editProduct.is_sold,
         is_verified: editProduct.is_verified,
+        purchase_button_enabled: !!editProduct.purchase_button_enabled,
+        delivery_method: editProduct.delivery_method || null,
+        delivery_time: editProduct.delivery_time || null,
+        delivery_fee: editProduct.delivery_fee === "" || editProduct.delivery_fee == null
+          ? null
+          : Number(editProduct.delivery_fee),
+        delivery_fee_type: editProduct.delivery_fee_type || null,
+        tracking_provided: !!editProduct.tracking_provided,
+        shipping_address: editProduct.shipping_address || null,
+        size: editProduct.size || null,
+        product_style: editProduct.product_style || null,
+        return_policy: editProduct.return_policy || null,
+        warranty_info: editProduct.warranty_info || null,
+        packaging_info: editProduct.packaging_info || null,
       });
       notifySuccess("Product updated successfully");
       setEditProduct(null);
@@ -1221,13 +1250,13 @@ function Products() {
       {/* Edit Product Dialog */}
       {canManageListings && (
         <Dialog open={!!editProduct} onOpenChange={() => setEditProduct(null)}>
-          <DialogContent className="max-w-md" onOpenAutoFocus={(e) => e.preventDefault()}>
+          <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto" onOpenAutoFocus={(e) => e.preventDefault()}>
             <DialogHeader>
-              <DialogTitle>Edit Product Status</DialogTitle>
+              <DialogTitle>Edit Product Details</DialogTitle>
             </DialogHeader>
             {editProduct && (
               <div className="space-y-4 py-4">
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-4">
                   <div className="grid gap-2">
                     <Label htmlFor="product-name">Product Name</Label>
                     <Input
@@ -1237,6 +1266,18 @@ function Products() {
                     />
                   </div>
                   <div className="grid gap-2">
+                    <Label htmlFor="product-description">Description</Label>
+                    <Textarea
+                      id="product-description"
+                      rows={4}
+                      value={editProduct.description || ""}
+                      onChange={(e) => setEditProduct({ ...editProduct, description: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="grid gap-2">
                     <Label htmlFor="product-price">Price</Label>
                     <Input
                       id="product-price"
@@ -1244,6 +1285,16 @@ function Products() {
                       step="0.01"
                       value={editProduct.price ?? ""}
                       onChange={(e) => setEditProduct({ ...editProduct, price: e.target.value })}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="product-stock-quantity">Stock Quantity</Label>
+                    <Input
+                      id="product-stock-quantity"
+                      type="number"
+                      min="0"
+                      value={editProduct.stock_quantity ?? 0}
+                      onChange={(e) => setEditProduct({ ...editProduct, stock_quantity: e.target.value })}
                     />
                   </div>
                 </div>
@@ -1266,40 +1317,203 @@ function Products() {
                       </SelectContent>
                     </Select>
                   </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="product-stock-status">Stock Status</Label>
+                    <Select
+                      value={editProduct.stock_status || "In Stock"}
+                      onValueChange={(value) => setEditProduct({ ...editProduct, stock_status: value })}
+                    >
+                      <SelectTrigger id="product-stock-status">
+                        <SelectValue placeholder="Select stock status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {STOCK_STATUSES.map((statusItem) => (
+                          <SelectItem key={statusItem.value} value={statusItem.value}>
+                            {statusItem.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="is-active">Active</Label>
-                  <Switch
-                    id="is-active"
-                    checked={editProduct.is_active}
-                    onCheckedChange={(checked) => setEditProduct({ ...editProduct, is_active: checked })}
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="grid gap-2">
+                    <Label htmlFor="product-deal-method">Deal Method</Label>
+                    <Input
+                      id="product-deal-method"
+                      value={editProduct.deal_method || ""}
+                      onChange={(e) => setEditProduct({ ...editProduct, deal_method: e.target.value })}
+                      placeholder="Delivery / Meet Up / Delivery, Meet Up"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="product-size">Size</Label>
+                    <Input
+                      id="product-size"
+                      value={editProduct.size || ""}
+                      onChange={(e) => setEditProduct({ ...editProduct, size: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="grid gap-2">
+                    <Label htmlFor="meetup-date">Meetup Date</Label>
+                    <Input
+                      id="meetup-date"
+                      type="date"
+                      value={editProduct.meetup_date || ""}
+                      onChange={(e) => setEditProduct({ ...editProduct, meetup_date: e.target.value })}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="meetup-time">Meetup Time</Label>
+                    <Input
+                      id="meetup-time"
+                      value={editProduct.meetup_time || ""}
+                      onChange={(e) => setEditProduct({ ...editProduct, meetup_time: e.target.value })}
+                      placeholder="e.g. 14:00"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="delivery-fee">Delivery Fee</Label>
+                    <Input
+                      id="delivery-fee"
+                      type="number"
+                      step="0.01"
+                      value={editProduct.delivery_fee ?? ""}
+                      onChange={(e) => setEditProduct({ ...editProduct, delivery_fee: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="grid gap-2">
+                    <Label htmlFor="meetup-location">Meetup Location</Label>
+                    <Input
+                      id="meetup-location"
+                      value={editProduct.meetup_location || ""}
+                      onChange={(e) => setEditProduct({ ...editProduct, meetup_location: e.target.value })}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="product-style">Product Style</Label>
+                    <Input
+                      id="product-style"
+                      value={editProduct.product_style || ""}
+                      onChange={(e) => setEditProduct({ ...editProduct, product_style: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="grid gap-2">
+                    <Label htmlFor="delivery-method">Delivery Method</Label>
+                    <Input
+                      id="delivery-method"
+                      value={editProduct.delivery_method || ""}
+                      onChange={(e) => setEditProduct({ ...editProduct, delivery_method: e.target.value })}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="delivery-time">Delivery Time</Label>
+                    <Input
+                      id="delivery-time"
+                      value={editProduct.delivery_time || ""}
+                      onChange={(e) => setEditProduct({ ...editProduct, delivery_time: e.target.value })}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="delivery-fee-type">Delivery Fee Type</Label>
+                    <Input
+                      id="delivery-fee-type"
+                      value={editProduct.delivery_fee_type || ""}
+                      onChange={(e) => setEditProduct({ ...editProduct, delivery_fee_type: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="shipping-address">Shipping Address</Label>
+                  <Textarea
+                    id="shipping-address"
+                    rows={2}
+                    value={editProduct.shipping_address || ""}
+                    onChange={(e) => setEditProduct({ ...editProduct, shipping_address: e.target.value })}
                   />
                 </div>
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="is-verified">Verified</Label>
-                  <Switch
-                    id="is-verified"
-                    checked={editProduct.is_verified}
-                    onCheckedChange={(checked) => setEditProduct({ ...editProduct, is_verified: checked })}
-                  // disabled={editProduct.is_verified}
-                  />
+
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="grid gap-2">
+                    <Label htmlFor="return-policy">Return Policy</Label>
+                    <Input
+                      id="return-policy"
+                      value={editProduct.return_policy || ""}
+                      onChange={(e) => setEditProduct({ ...editProduct, return_policy: e.target.value })}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="warranty-info">Warranty Info</Label>
+                    <Input
+                      id="warranty-info"
+                      value={editProduct.warranty_info || ""}
+                      onChange={(e) => setEditProduct({ ...editProduct, warranty_info: e.target.value })}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="packaging-info">Packaging Info</Label>
+                    <Input
+                      id="packaging-info"
+                      value={editProduct.packaging_info || ""}
+                      onChange={(e) => setEditProduct({ ...editProduct, packaging_info: e.target.value })}
+                    />
+                  </div>
                 </div>
-                {/* <div className="flex items-center justify-between">
-                <Label htmlFor="is-flagged">Flagged</Label>
-                <Switch
-                  id="is-flagged"
-                  checked={editProduct.is_flagged}
-                  onCheckedChange={(checked) => setEditProduct({ ...editProduct, is_flagged: checked })}
-                />
-              </div> */}
-                {/* <div className="flex items-center justify-between">
-                <Label htmlFor="is-featured">Featured</Label>
-                <Switch
-                  id="is-featured"
-                  checked={editProduct.is_spotlighted}
-                  onCheckedChange={(checked) => setEditProduct({ ...editProduct, is_spotlighted: checked })}
-                />
-              </div> */}
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="is-active">Active</Label>
+                    <Switch
+                      id="is-active"
+                      checked={!!editProduct.is_active}
+                      onCheckedChange={(checked) => setEditProduct({ ...editProduct, is_active: checked })}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="is-verified">Verified</Label>
+                    <Switch
+                      id="is-verified"
+                      checked={!!editProduct.is_verified}
+                      onCheckedChange={(checked) => setEditProduct({ ...editProduct, is_verified: checked })}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="is-sold">Sold</Label>
+                    <Switch
+                      id="is-sold"
+                      checked={!!editProduct.is_sold}
+                      onCheckedChange={(checked) => setEditProduct({ ...editProduct, is_sold: checked })}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="purchase-button-enabled">Purchase Button Enabled</Label>
+                    <Switch
+                      id="purchase-button-enabled"
+                      checked={!!editProduct.purchase_button_enabled}
+                      onCheckedChange={(checked) => setEditProduct({ ...editProduct, purchase_button_enabled: checked })}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="tracking-provided">Tracking Provided</Label>
+                    <Switch
+                      id="tracking-provided"
+                      checked={!!editProduct.tracking_provided}
+                      onCheckedChange={(checked) => setEditProduct({ ...editProduct, tracking_provided: checked })}
+                    />
+                  </div>
+                </div>
+
                 <div className="flex justify-between items-center pt-4">
                   <Button
                     variant="outline"
