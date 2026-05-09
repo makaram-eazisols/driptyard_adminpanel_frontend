@@ -95,6 +95,8 @@ const buildMenuItems = (user) => {
   // Logs & Audit Trails - typically admin only
   if (isAdmin || user?.role === "admin") {
     items.push({ title: "Logs & Audit Trails", url: "/admin/logs", icon: FileText });
+    items.push({ title: "Manage Packages", url: "/admin/manage-packages", icon: Package2 });
+    items.push({ title: "Bump Package", url: "/admin/bump-package-settings", icon: Package2 });
     items.push({ title: "Settings", url: "/admin/settings", icon: Settings });
   }
 

@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Mail, Send, CheckCircle, Eye, EyeOff, Lock, Loader2, AlertCircle, Pencil, Trash2 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import { useAuth } from "@/hooks/use-auth";
@@ -20,7 +20,7 @@ import { notifyError, notifySuccess } from "@/lib/toast";
 import { MembershipSettingsSection } from "@/components/admin/MembershipSettingsSection";
 import { ConfirmActionDialog } from "@/components/modals/ConfirmActionDialog";
 
-function Settings() {
+export function Settings({ defaultTab = "settings" }) {
   const { user } = useAuth();
   const [emailProvider, setEmailProvider] = useState("smtp");
   const [testEmail, setTestEmail] = useState("");
@@ -488,20 +488,7 @@ function Settings() {
           <h1 className="text-3xl font-bold text-secondary">Settings</h1>
           <p className="text-muted-foreground mt-1">Manage your store settings</p>
         </div>
-        <Tabs defaultValue="settings" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)] gap-6 items-start">
-            <TabsList className="h-fit w-full flex flex-col items-stretch bg-muted/40 p-1">
-              <TabsTrigger value="settings" className="w-full justify-start">
-                Settings
-              </TabsTrigger>
-              <TabsTrigger value="manage-packages" className="w-full justify-start">
-                Manage Packages
-              </TabsTrigger>
-              <TabsTrigger value="bump-package-settings" className="w-full justify-start">
-                Bump Package Settings
-              </TabsTrigger>
-            </TabsList>
-            <div>
+        <Tabs defaultValue={defaultTab} className="space-y-6">
               <TabsContent value="settings" className="mt-0 space-y-6">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="w-full">
@@ -1577,8 +1564,6 @@ function Settings() {
                   </CardContent>
                 </Card>
               </TabsContent>
-            </div>
-          </div>
         </Tabs>
         <ConfirmActionDialog
           open={!!deleteTarget}
