@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Loader2, Search, Filter, MoreVertical, CheckCircle, Eye } from "lucide-react";
+import { Loader2, Search, Filter, MoreVertical, CheckCircle, Eye, Star } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import { notifyError, notifySuccess } from "@/lib/toast";
 import {
@@ -18,13 +18,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const TYPE_OPTIONS = [
   { label: "All types", value: "all" },
   { label: "Product", value: "product" },
   { label: "Order", value: "order" },
   { label: "General", value: "general" },
+  { label: "Review red flags", value: "review_flag" },
   { label: "User", value: "user" },
   { label: "Conversation", value: "conversation" },
 ];
@@ -64,6 +65,7 @@ function Reports() {
   const [orderConvMessages, setOrderConvMessages] = useState([]);
   const [orderConvMeta, setOrderConvMeta] = useState(null);
   const [orderConvReport, setOrderConvReport] = useState(null);
+  const [reviewFlagModalReport, setReviewFlagModalReport] = useState(null);
 
   const fetchReports = async () => {
     setLoading(true);
@@ -125,7 +127,10 @@ function Reports() {
         }),
       );
 
-      (data.general_reports || []).forEach((r) =>
+      (data.general_reports || []).forEach((r) => {
+        const isReviewRedFlag = Boolean(r.review_id);
+        const preview = r.review_preview;
+        const orderLabel = r.order_number ? `Order ${r.order_number}` : r.target_id ? `Order #${r.target_id}` : "Order";
         flatten.push({
           id: `general-${r.id}`,
           rawId: r.id,
@@ -135,9 +140,21 @@ function Reports() {
           description: r.description,
           created_at: r.created_at,
           reporter_id: r.reporter_id,
-          target: r.target_type && r.target_id ? `${r.target_type} #${r.target_id}` : r.target_type || "General",
-        }),
-      );
+          reporter_username: r.reporter_username,
+          reporter_email: r.reporter_email,
+          target_id: r.target_id,
+          target_type: r.target_type,
+          review_id: r.review_id,
+          order_number: r.order_number,
+          review_preview: preview,
+          isReviewRedFlag,
+          target: isReviewRedFlag
+            ? `Review #${preview?.id ?? r.review_id} (${orderLabel})`
+            : r.target_type && r.target_id
+              ? `${r.target_type} #${r.target_id}`
+              : r.target_type || "General",
+        });
+      });
 
       (data.user_reports || []).forEach((r) =>
         flatten.push({
@@ -209,7 +226,11 @@ function Reports() {
     let next = [...allReports];
 
     if (typeFilter !== "all") {
-      next = next.filter((r) => r.type === typeFilter);
+      if (typeFilter === "review_flag") {
+        next = next.filter((r) => r.isReviewRedFlag);
+      } else {
+        next = next.filter((r) => r.type === typeFilter);
+      }
     }
 
     if (search.trim()) {
@@ -221,7 +242,9 @@ function Reports() {
           (r.status || "").toLowerCase().includes(q) ||
           (r.target || "").toLowerCase().includes(q) ||
           String(r.reporter_id || "").toLowerCase().includes(q) ||
-          String(r.reporter_email || "").toLowerCase().includes(q)
+          String(r.reporter_email || "").toLowerCase().includes(q) ||
+          (r.reporter_username || "").toLowerCase().includes(q) ||
+          (r.review_preview?.review_text || "").toLowerCase().includes(q)
         );
       });
     }
@@ -491,7 +514,22 @@ function Reports() {
     );
   };
 
-  console.log("Testing.....", getConversationProductName());
+  const normalizeReviewPhotosAdmin = (photos) => {
+    if (!photos) return [];
+    if (typeof photos === "string") {
+      try {
+        const parsed = JSON.parse(photos);
+        return Array.isArray(parsed) ? parsed : [photos];
+      } catch {
+        return [photos];
+      }
+    }
+    if (!Array.isArray(photos)) return [];
+    return photos
+      .map((p) => (typeof p === "string" ? p : p?.url || p?.image_url || p?.src || null))
+      .filter((url) => typeof url === "string" && url.trim().length > 0);
+  };
+
   return (
     <AdminLayout>
       <div className="space-y-6">
@@ -557,7 +595,9 @@ function Reports() {
                   <TableBody>
                     {filteredReports.map((r) => (
                       <TableRow key={r.id}>
-                        <TableCell className="capitalize">{r.type}</TableCell>
+                        <TableCell className="capitalize">
+                          {r.isReviewRedFlag ? "review flag" : r.type}
+                        </TableCell>
                         <TableCell>{r.target || "—"}</TableCell>
                         <TableCell>
                           <div className="flex flex-col text-xs">
@@ -669,6 +709,42 @@ function Reports() {
                                   >
                                     <Eye className="h-4 w-4 mr-1" />
                                     <span>View Conversation</span>
+                                  </DropdownMenuItem>
+                                  {[
+                                    { label: "Pending", value: "pending" },
+                                    { label: "Accepted", value: "approved" },
+                                    { label: "Rejected", value: "rejected" },
+                                  ].map(({ label, value }) => {
+                                    const key = `status-${r.id}-${value}`;
+                                    const currentStatus = (r.status || "").toLowerCase();
+                                    const isActive = currentStatus === value;
+                                    return (
+                                      <DropdownMenuItem
+                                        key={value}
+                                        className="cursor-pointer flex items-center gap-2"
+                                        disabled={actionLoading[key]}
+                                        onClick={() => handleStatusChange(r, value)}
+                                      >
+                                        {actionLoading[key] ? (
+                                          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                        ) : isActive ? (
+                                          <CheckCircle className="h-4 w-4 mr-1 text-green-600" />
+                                        ) : (
+                                          <span className="h-2 w-2 rounded-full bg-muted-foreground mr-2" />
+                                        )}
+                                        <span>{label}</span>
+                                      </DropdownMenuItem>
+                                    );
+                                  })}
+                                </>
+                              ) : r.type === "general" && r.isReviewRedFlag ? (
+                                <>
+                                  <DropdownMenuItem
+                                    className="cursor-pointer flex items-center gap-2"
+                                    onClick={() => setReviewFlagModalReport(r)}
+                                  >
+                                    <Eye className="h-4 w-4 mr-1" />
+                                    <span>View reported review</span>
                                   </DropdownMenuItem>
                                   {[
                                     { label: "Pending", value: "pending" },
@@ -1112,6 +1188,91 @@ function Reports() {
               })
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!reviewFlagModalReport}
+        onOpenChange={(open) => {
+          if (!open) setReviewFlagModalReport(null);
+        }}
+      >
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Reported review</DialogTitle>
+            <DialogDescription>
+              {reviewFlagModalReport?.target || "Review flag report"}
+              {reviewFlagModalReport?.rawId != null ? ` · Report #${reviewFlagModalReport.rawId}` : ""}
+            </DialogDescription>
+          </DialogHeader>
+          {reviewFlagModalReport?.review_preview ? (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center gap-2">
+                {Array.from({ length: 5 }, (_, i) => (
+                  <Star
+                    key={i}
+                    className={`h-5 w-5 ${
+                      i < Math.floor(Number(reviewFlagModalReport.review_preview.overall_rating) || 0)
+                        ? "fill-amber-400 text-amber-400"
+                        : "fill-muted-foreground/20 text-muted-foreground"
+                    }`}
+                  />
+                ))}
+                <Badge variant="outline" className="capitalize">
+                  {(reviewFlagModalReport.status || "pending").toLowerCase()}
+                </Badge>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Reviewer:{" "}
+                <span className="font-medium text-foreground">
+                  @{reviewFlagModalReport.review_preview.reviewer_username || "—"}
+                </span>
+              </p>
+              <div className="rounded-md border border-border bg-muted/30 p-3 text-sm whitespace-pre-wrap break-words min-h-[72px] max-h-[40vh] overflow-y-auto">
+                {reviewFlagModalReport.review_preview.review_text || "—"}
+              </div>
+              {normalizeReviewPhotosAdmin(reviewFlagModalReport.review_preview.photos).length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground">Buyer photos</p>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    {normalizeReviewPhotosAdmin(reviewFlagModalReport.review_preview.photos).map((url, idx) => (
+                      <a
+                        key={`rf-photo-${idx}`}
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block overflow-hidden rounded-md border border-border bg-muted/20"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={url}
+                          alt=""
+                          className="h-24 w-full object-cover"
+                        />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No review snapshot available for this report.</p>
+          )}
+          <div className="text-sm space-y-2 border-t border-border pt-4">
+            <p>
+              <span className="font-medium text-foreground">Flag reason: </span>
+              {reviewFlagModalReport?.reason || "—"}
+            </p>
+            <p className="whitespace-pre-wrap break-words">
+              <span className="font-medium text-foreground">Submission: </span>
+              {reviewFlagModalReport?.description || "—"}
+            </p>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="secondary" onClick={() => setReviewFlagModalReport(null)}>
+              Close
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </AdminLayout>

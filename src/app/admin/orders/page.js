@@ -318,10 +318,16 @@ function Orders() {
 
   const getOrderFinancials = (order) => {
     const totalAmount = Number(order?.total_amount ?? order?.total ?? 0);
+    const shippingCost = Number(order?.shipping_cost || 0);
+    const buyerPlatformFee = Number(order?.buyer_platform_fee || 0);
     const platformFees = Number(order?.seller_platform_fee ?? order?.driptyard_fee ?? 0);
     const stripeFees = Number(order?.stripe_fee || 0);
     const promoDiscount = Number(order?.discount_amount || 0);
-    const basePayableAmount = (totalAmount - stripeFees - platformFees) + promoDiscount;
+    // Matches checkout: total_amount = unit_price + shipping + buyer_platform_fee - discount_amount
+    // => amount attributed to the listing before seller fees:
+    const sellerGrossBeforeSellerFees = totalAmount + promoDiscount - shippingCost - buyerPlatformFee;
+    // Legacy fallback when seller_payout_amount was never stored (should not subtract buyer-side pieces twice).
+    const basePayableFromBuyerTotal = sellerGrossBeforeSellerFees - stripeFees - platformFees;
 
     const bumpPackageCode = String(order?.spotlight_package_code || "").toLowerCase();
     // Center Stage Special carries a 2% platform commission deducted from seller payout.
@@ -333,10 +339,37 @@ function Orders() {
     const commissionAmount = isCenterStagePackage
       ? (order?.spotlight_commission_applied ? commissionAmountApplied : commissionEstimated)
       : 0;
-    const payableAmountAfterCommission = basePayableAmount - commissionAmount;
+
+    const rawStored = order?.seller_payout_amount;
+    const storedSellerPayout =
+      rawStored != null && rawStored !== "" ? Number(rawStored) : NaN;
+    const hasStoredSellerPayout = Number.isFinite(storedSellerPayout);
+
+    // Checkout stores seller_payout_amount as unit price minus seller fees (matches wallet / payout rows).
+    // total_amount also includes buyer platform fee and shipping, so total_amount - seller fees is not seller net.
+    let basePayableAmount;
+    let payableAmountAfterCommission;
+    if (hasStoredSellerPayout) {
+      if (isCenterStagePackage && order?.spotlight_commission_applied) {
+        basePayableAmount = storedSellerPayout + commissionAmountApplied;
+      } else {
+        basePayableAmount = storedSellerPayout;
+      }
+      if (isCenterStagePackage && !order?.spotlight_commission_applied) {
+        payableAmountAfterCommission = Math.max(0, storedSellerPayout - commissionAmount);
+      } else {
+        payableAmountAfterCommission = storedSellerPayout;
+      }
+    } else {
+      basePayableAmount = basePayableFromBuyerTotal;
+      payableAmountAfterCommission = basePayableFromBuyerTotal - commissionAmount;
+    }
 
     return {
       totalAmount,
+      shippingCost,
+      buyerPlatformFee,
+      sellerGrossBeforeSellerFees,
       platformFees,
       stripeFees,
       promoDiscount,
@@ -352,10 +385,11 @@ function Orders() {
   const orderDetailFields = (order) => {
     if (!order) return [];
     const productTitle = order.product_details?.title;
-    const shippingCost = Number(order.shipping_cost || 0);
-    const buyerPlatformFee = Number(order.buyer_platform_fee || 0);
     const {
       totalAmount,
+      shippingCost,
+      buyerPlatformFee,
+      sellerGrossBeforeSellerFees,
       platformFees,
       stripeFees,
       promoDiscount,
@@ -371,7 +405,11 @@ function Orders() {
       { label: "Order ID", value: order.id },
       { label: "Product", value: productTitle ? `${productTitle} (ID: ${order.product_details.id})` : String(order.product_details.id) },
       { label: "Date", value: order.created_at ? new Date(order.created_at).toLocaleString() : "—" },
-      { label: "Total Amount", value: formatCurrency(totalAmount) },
+      { label: "Total Amount (buyer paid)", value: formatCurrency(totalAmount) },
+      {
+        label: "Seller base before seller fees",
+        value: formatCurrency(sellerGrossBeforeSellerFees),
+      },
       { label: "Refund amount to pay (cancelled order)", value: String(order.status || "").toUpperCase() === "CANCELLED" ? formatCurrency(totalAmount) : "—" },
       { label: "Unit price", value: formatCurrency(order.unit_price) },
       { label: "Quantity", value: order.quantity },
@@ -543,6 +581,9 @@ function Orders() {
                           {(() => {
                             const {
                               totalAmount,
+                              shippingCost,
+                              buyerPlatformFee,
+                              sellerGrossBeforeSellerFees,
                               platformFees,
                               stripeFees,
                               promoDiscount,
@@ -562,28 +603,45 @@ function Orders() {
                                 Cancelled order refund amount: {formatCurrency(totalAmount)}
                               </span>
                             )}
-                            <span className="text-muted-foreground">
-                              Total Amount: {formatCurrency(totalAmount)}
-                            </span>
-                            <span className="text-muted-foreground">
-                              Platform Fees: {formatCurrency(platformFees)}
-                            </span>
-                            <span className="text-muted-foreground">
-                              Stripe Fees: {formatCurrency(stripeFees)}
-                            </span>
-                            {promoDiscount > 0 && (
-                              <span className="text-muted-foreground">
-                                Promo Discount{order.promo_code ? ` (${order.promo_code})` : ""}: +{formatCurrency(promoDiscount)}
-                              </span>
+                            {!isCancelledOrder && (
+                              <>
+                                <span className="text-muted-foreground border-t border-border/60 pt-0.5 mt-0.5">
+                                  Buyer paid (total): {formatCurrency(totalAmount)}
+                                </span>
+                                {shippingCost > 0 && (
+                                  <span className="text-muted-foreground">
+                                    Shipping (in buyer total): {formatCurrency(shippingCost)}
+                                  </span>
+                                )}
+                                {buyerPlatformFee > 0 && (
+                                  <span className="text-muted-foreground">
+                                    Buyer platform fee (in buyer total): {formatCurrency(buyerPlatformFee)}
+                                  </span>
+                                )}
+                                {promoDiscount > 0 && (
+                                  <span className="text-muted-foreground">
+                                    Promo discount (buyer checkout){order.promo_code ? ` (${order.promo_code})` : ""}: {formatCurrency(promoDiscount)}
+                                  </span>
+                                )}
+                                <span className="text-muted-foreground border-t border-border/60 pt-0.5 mt-0.5">
+                                  Seller base (before seller fees): {formatCurrency(sellerGrossBeforeSellerFees)}
+                                </span>
+                                <span className="text-muted-foreground">
+                                  Seller platform fee: {formatCurrency(platformFees)}
+                                </span>
+                                <span className="text-muted-foreground">
+                                  Stripe fee (seller): {formatCurrency(stripeFees)}
+                                </span>
+                                {isCenterStagePackage && (
+                                  <span className="text-muted-foreground">
+                                    Center Stage commission ({commissionRate}%): −{formatCurrency(commissionAmount)}
+                                  </span>
+                                )}
+                                <span className="text-muted-foreground font-medium">
+                                  Payable to seller: {formatCurrency(payableAmountAfterCommission)}
+                                </span>
+                              </>
                             )}
-                            {isCenterStagePackage && (
-                              <span className="text-muted-foreground">
-                                Center Stage Commission ({commissionRate}%): -{formatCurrency(commissionAmount)}
-                              </span>
-                            )}
-                            <span className="text-muted-foreground">
-                              Payable Amount: {formatCurrency(payableAmountAfterCommission)}
-                            </span>
                           </div>
                             );
                           })()}
