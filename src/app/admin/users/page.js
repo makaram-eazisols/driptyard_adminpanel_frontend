@@ -864,7 +864,7 @@ function Users() {
                         )}
                       </Tooltip>
                     </TooltipProvider>
-                    <Button
+                    {/* <Button
                       variant="destructive"
                       size="sm"
                       onClick={() => setBulkDeleteDialog(true)}
@@ -872,7 +872,7 @@ function Users() {
                     >
                       <Trash2 className="h-4 w-4 mr-2" />
                       Delete
-                    </Button>
+                    </Button> */}
                     <Button
                       variant="ghost"
                       size="sm"
@@ -915,172 +915,172 @@ function Users() {
                     {users?.map((user) => {
                       const planMeta = getUserPlanMeta(user);
                       return (
-                      <TableRow key={user.id || user.user_id} className="hover:bg-muted/30 transition-colors">
-                        {canManageUsers && (
-                          <TableCell className="py-3 px-4">
-                            <Checkbox
-                              checked={selectedUsers.has(user.id)}
-                              onCheckedChange={(checked) => handleSelectUser(user.id, checked)}
-                            />
-                          </TableCell>
-                        )}
-                        <TableCell className="py-3 px-4">
-                          <p
-                            className="font-semibold text-sm text-primary leading-tight cursor-pointer hover:text-accent transition-colors"
-                            onDoubleClick={() => handleUsernameDoubleClick(user)}
-                            title="Double-click to view details"
-                          >
-                            {user?.username || "Unknown User"}
-                          </p>
-                        </TableCell>
-                        <TableCell className="py-3 px-4">
-                          <p className="text-sm text-foreground">{user.email}</p>
-                        </TableCell>
-                        <TableCell className="py-3 px-4">
-                          <p className="text-sm text-foreground">{user.listings_count || 0}</p>
-                        </TableCell>
-                        <TableCell className="py-3 px-4">
-                          <Badge variant="outline" className={`text-xs font-medium ${planMeta.className}`}>
-                            {planMeta.label}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="py-3 px-4">
-                          <Badge variant={getStatusBadgeVariant(user)} className="text-xs">{getStatusText(user)}</Badge>
-                        </TableCell>
-                        <TableCell className="py-3 px-4">
-                          {user.business_profile ? (
-                            <Badge
-                              variant={getBusinessVerificationBadgeVariant(user)}
-                              className="text-xs"
-                            >
-                              {getBusinessVerificationBadgeLabel(user)}
-                            </Badge>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">N/A</span>
+                        <TableRow key={user.id || user.user_id} className="hover:bg-muted/30 transition-colors">
+                          {canManageUsers && (
+                            <TableCell className="py-3 px-4">
+                              <Checkbox
+                                checked={selectedUsers.has(user.id)}
+                                onCheckedChange={(checked) => handleSelectUser(user.id, checked)}
+                              />
+                            </TableCell>
                           )}
-                        </TableCell>
-                        <TableCell className="py-3 px-4">
-                          <p className="text-sm text-foreground">{format(new Date(user.created_at), "MMM dd, yyyy")}</p>
-                        </TableCell>
-                        {canManageUsers && (
-                          <TableCell className="py-3 px-4 text-right">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8">
-                                  <MoreVertical className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem className="cursor-pointer" onClick={() => handleViewUser(user)}>
-                                  <Eye className="h-4 w-4 mr-2" />
-                                  View
-                                </DropdownMenuItem>
-                                <DropdownMenuItem className="cursor-pointer" onClick={() => handleEditUser(user)}>
-                                  <Edit2 className="h-4 w-4 mr-2" />
-                                  Edit
-                                </DropdownMenuItem>
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <span className="w-full">
-                                        <DropdownMenuItem
-                                          className={user.is_suspended ? "cursor-pointer" : "cursor-not-allowed opacity-50"}
-                                          onClick={() => {
-                                            if (user.is_suspended) {
-                                              handleUnsuspendUser(user.id);
-                                            }
-                                          }}
-                                          disabled={!user.is_suspended}
-                                          onSelect={(e) => {
-                                            if (!user.is_suspended) {
-                                              e.preventDefault();
-                                            }
-                                          }}
-                                        >
-                                          <Unlock className="h-4 w-4 mr-2" />
-                                          Reinstate
-                                        </DropdownMenuItem>
-                                      </span>
-                                    </TooltipTrigger>
-                                    {!user.is_suspended && (
-                                      <TooltipContent>
-                                        <p>User already reinstated</p>
-                                      </TooltipContent>
-                                    )}
-                                  </Tooltip>
-                                </TooltipProvider>
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <span className="w-full">
-                                        <DropdownMenuItem
-                                          className={user.is_suspended ? "cursor-not-allowed opacity-50" : "cursor-pointer"}
-                                          onClick={() => {
-                                            if (!user.is_suspended) {
-                                              setSuspendUserId(user.id);
-                                            }
-                                          }}
-                                          disabled={user.is_suspended}
-                                          onSelect={(e) => {
-                                            if (user.is_suspended) {
-                                              e.preventDefault();
-                                            }
-                                          }}
-                                        >
-                                          <Ban className="h-4 w-4 mr-2" />
-                                          Suspend
-                                        </DropdownMenuItem>
-                                      </span>
-                                    </TooltipTrigger>
-                                    {user.is_suspended && (
-                                      <TooltipContent>
-                                        <p>User already suspended</p>
-                                      </TooltipContent>
-                                    )}
-                                  </Tooltip>
-                                </TooltipProvider>
-                                <DropdownMenuItem className="cursor-pointer" onClick={() => setResetPasswordUserId(user.id)}>
-                                  <KeyRound className="h-4 w-4 mr-2" />
-                                  Reset Password
-                                </DropdownMenuItem>
-                                {user.business_profile && (
-                                  <>
-                                    <DropdownMenuItem
-                                      className="cursor-pointer"
-                                      disabled={
-                                        businessVerificationUpdatingUserId === (user.id || user.user_id) ||
-                                        getBusinessVerificationStatus(user) === "verified"
-                                      }
-                                      onClick={() => handleBusinessVerificationStatusUpdate(user, "verified")}
-                                    >
-                                      <CheckCircle className="h-4 w-4 mr-2" />
-                                      Approve Business
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                      className="cursor-pointer"
-                                      disabled={
-                                        businessVerificationUpdatingUserId === (user.id || user.user_id) ||
-                                        getBusinessVerificationStatus(user) === "rejected"
-                                      }
-                                      onClick={() => handleBusinessVerificationStatusUpdate(user, "rejected")}
-                                    >
-                                      <XCircle className="h-4 w-4 mr-2" />
-                                      Reject Business
-                                    </DropdownMenuItem>
-                                  </>
-                                )}
-                                <DropdownMenuItem
-                                  className="text-destructive cursor-pointer focus:text-destructive"
-                                  onClick={() => setDeleteUserId(user.id)}
-                                >
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
+                          <TableCell className="py-3 px-4">
+                            <p
+                              className="font-semibold text-sm text-primary leading-tight cursor-pointer hover:text-accent transition-colors"
+                              onDoubleClick={() => handleUsernameDoubleClick(user)}
+                              title="Double-click to view details"
+                            >
+                              {user?.username || "Unknown User"}
+                            </p>
                           </TableCell>
-                        )}
-                      </TableRow>
+                          <TableCell className="py-3 px-4">
+                            <p className="text-sm text-foreground">{user.email}</p>
+                          </TableCell>
+                          <TableCell className="py-3 px-4">
+                            <p className="text-sm text-foreground">{user.listings_count || 0}</p>
+                          </TableCell>
+                          <TableCell className="py-3 px-4">
+                            <Badge variant="outline" className={`text-xs font-medium ${planMeta.className}`}>
+                              {planMeta.label}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="py-3 px-4">
+                            <Badge variant={getStatusBadgeVariant(user)} className="text-xs">{getStatusText(user)}</Badge>
+                          </TableCell>
+                          <TableCell className="py-3 px-4">
+                            {user.business_profile ? (
+                              <Badge
+                                variant={getBusinessVerificationBadgeVariant(user)}
+                                className="text-xs"
+                              >
+                                {getBusinessVerificationBadgeLabel(user)}
+                              </Badge>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">N/A</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="py-3 px-4">
+                            <p className="text-sm text-foreground">{format(new Date(user.created_at), "MMM dd, yyyy")}</p>
+                          </TableCell>
+                          {canManageUsers && (
+                            <TableCell className="py-3 px-4 text-right">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                                    <MoreVertical className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem className="cursor-pointer" onClick={() => handleViewUser(user)}>
+                                    <Eye className="h-4 w-4 mr-2" />
+                                    View
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem className="cursor-pointer" onClick={() => handleEditUser(user)}>
+                                    <Edit2 className="h-4 w-4 mr-2" />
+                                    Edit
+                                  </DropdownMenuItem>
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <span className="w-full">
+                                          <DropdownMenuItem
+                                            className={user.is_suspended ? "cursor-pointer" : "cursor-not-allowed opacity-50"}
+                                            onClick={() => {
+                                              if (user.is_suspended) {
+                                                handleUnsuspendUser(user.id);
+                                              }
+                                            }}
+                                            disabled={!user.is_suspended}
+                                            onSelect={(e) => {
+                                              if (!user.is_suspended) {
+                                                e.preventDefault();
+                                              }
+                                            }}
+                                          >
+                                            <Unlock className="h-4 w-4 mr-2" />
+                                            Reinstate
+                                          </DropdownMenuItem>
+                                        </span>
+                                      </TooltipTrigger>
+                                      {!user.is_suspended && (
+                                        <TooltipContent>
+                                          <p>User already reinstated</p>
+                                        </TooltipContent>
+                                      )}
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <span className="w-full">
+                                          <DropdownMenuItem
+                                            className={user.is_suspended ? "cursor-not-allowed opacity-50" : "cursor-pointer"}
+                                            onClick={() => {
+                                              if (!user.is_suspended) {
+                                                setSuspendUserId(user.id);
+                                              }
+                                            }}
+                                            disabled={user.is_suspended}
+                                            onSelect={(e) => {
+                                              if (user.is_suspended) {
+                                                e.preventDefault();
+                                              }
+                                            }}
+                                          >
+                                            <Ban className="h-4 w-4 mr-2" />
+                                            Suspend
+                                          </DropdownMenuItem>
+                                        </span>
+                                      </TooltipTrigger>
+                                      {user.is_suspended && (
+                                        <TooltipContent>
+                                          <p>User already suspended</p>
+                                        </TooltipContent>
+                                      )}
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                  <DropdownMenuItem className="cursor-pointer" onClick={() => setResetPasswordUserId(user.id)}>
+                                    <KeyRound className="h-4 w-4 mr-2" />
+                                    Reset Password
+                                  </DropdownMenuItem>
+                                  {user.business_profile && (
+                                    <>
+                                      <DropdownMenuItem
+                                        className="cursor-pointer"
+                                        disabled={
+                                          businessVerificationUpdatingUserId === (user.id || user.user_id) ||
+                                          getBusinessVerificationStatus(user) === "verified"
+                                        }
+                                        onClick={() => handleBusinessVerificationStatusUpdate(user, "verified")}
+                                      >
+                                        <CheckCircle className="h-4 w-4 mr-2" />
+                                        Approve Business
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem
+                                        className="cursor-pointer"
+                                        disabled={
+                                          businessVerificationUpdatingUserId === (user.id || user.user_id) ||
+                                          getBusinessVerificationStatus(user) === "rejected"
+                                        }
+                                        onClick={() => handleBusinessVerificationStatusUpdate(user, "rejected")}
+                                      >
+                                        <XCircle className="h-4 w-4 mr-2" />
+                                        Reject Business
+                                      </DropdownMenuItem>
+                                    </>
+                                  )}
+                                  {/* <DropdownMenuItem
+                                    className="text-destructive cursor-pointer focus:text-destructive"
+                                    onClick={() => setDeleteUserId(user.id)}
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Delete
+                                  </DropdownMenuItem> */}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          )}
+                        </TableRow>
                       );
                     })}
                   </TableBody>
