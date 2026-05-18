@@ -45,6 +45,7 @@ function Users() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [status, setStatus] = useState("all");
+  const [accountType, setAccountType] = useState("all");
   // Backend supports: 'all', 'most_recent', 'least_recent'
   const [joinDateSort, setJoinDateSort] = useState("all");
   // Backend supports: 'all', 'most_recent', 'least_recent'
@@ -98,7 +99,7 @@ function Users() {
     fetchUsers();
     // Clear selection when filters change
     setSelectedUsers(new Set());
-  }, [currentPage, searchTerm, status, joinDateSort, listingsSort]);
+  }, [currentPage, searchTerm, status, accountType, joinDateSort, listingsSort]);
 
   const fetchUsers = async () => {
     try {
@@ -112,6 +113,10 @@ function Users() {
 
       if (status && status !== "all") {
         params.status = status;
+      }
+
+      if (accountType && accountType !== "all") {
+        params.account_type = accountType;
       }
 
       // Delegate sorting to backend
@@ -139,6 +144,7 @@ function Users() {
   const handleClearFilters = () => {
     setSearchTerm("");
     setStatus("all");
+    setAccountType("all");
     setJoinDateSort("all");
     setListingsSort("all");
     setCurrentPage(1);
@@ -150,9 +156,30 @@ function Users() {
     { value: "suspended", label: "Suspended" },
   ];
 
+  const ACCOUNT_TYPE_OPTIONS = [
+    { value: "all", label: "All Account Types" },
+    { value: "normal", label: "Normal User" },
+    { value: "business", label: "Business User" },
+  ];
+
+  const getAccountTypeMeta = (targetUser) => {
+    const isBusiness = targetUser?.has_sin_number === true;
+    if (isBusiness) {
+      return {
+        label: "Business",
+        className: "bg-indigo-100 text-indigo-700 border-indigo-200",
+      };
+    }
+    return {
+      label: "Normal",
+      className: "bg-slate-100 text-slate-700 border-slate-200",
+    };
+  };
+
   const hasActiveFilters =
     searchTerm ||
     (status && status !== "all") ||
+    (accountType && accountType !== "all") ||
     joinDateSort !== "all" ||
     listingsSort !== "all";
 
@@ -703,6 +730,7 @@ function Users() {
                   {[
                     searchTerm,
                     status && status !== "all" ? status : null,
+                    accountType && accountType !== "all" ? accountType : null,
                     joinDateSort !== "all" ? "join" : null,
                     listingsSort !== "all" ? "listings" : null
                   ].filter(Boolean).length}
@@ -754,6 +782,24 @@ function Users() {
                   </SelectTrigger>
                   <SelectContent>
                     {STATUS_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2 w-full md:w-auto md:min-w-[200px]">
+                <Label htmlFor="accountType">Account Type</Label>
+                <Select value={accountType} onValueChange={(value) => {
+                  setAccountType(value);
+                  setCurrentPage(1);
+                }}>
+                  <SelectTrigger id="accountType">
+                    <SelectValue placeholder="Select account type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ACCOUNT_TYPE_OPTIONS.map((option) => (
                       <SelectItem key={option.value} value={option.value}>
                         {option.label}
                       </SelectItem>
@@ -903,6 +949,7 @@ function Users() {
                       <TableHead className="h-12 px-4 font-semibold text-secondary">Email</TableHead>
                       <TableHead className="h-12 px-4 font-semibold text-secondary">Listings</TableHead>
                       <TableHead className="h-12 px-4 font-semibold text-secondary">Plan</TableHead>
+                      <TableHead className="h-12 px-4 font-semibold text-secondary">Account Type</TableHead>
                       <TableHead className="h-12 px-4 font-semibold text-secondary">Status</TableHead>
                       <TableHead className="h-12 px-4 font-semibold text-secondary">Business Verification</TableHead>
                       <TableHead className="h-12 px-4 font-semibold text-secondary">Joined</TableHead>
@@ -914,6 +961,7 @@ function Users() {
                   <TableBody>
                     {users?.map((user) => {
                       const planMeta = getUserPlanMeta(user);
+                      const accountTypeMeta = getAccountTypeMeta(user);
                       return (
                         <TableRow key={user.id || user.user_id} className="hover:bg-muted/30 transition-colors">
                           {canManageUsers && (
@@ -942,6 +990,11 @@ function Users() {
                           <TableCell className="py-3 px-4">
                             <Badge variant="outline" className={`text-xs font-medium ${planMeta.className}`}>
                               {planMeta.label}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="py-3 px-4">
+                            <Badge variant="outline" className={`text-xs font-medium ${accountTypeMeta.className}`}>
+                              {accountTypeMeta.label}
                             </Badge>
                           </TableCell>
                           <TableCell className="py-3 px-4">
@@ -1686,6 +1739,12 @@ function Users() {
                   </div>
                 </div>
                 <div className="grid gap-4 md:grid-cols-2">
+                  <div className="grid gap-2">
+                    <Label className="text-muted-foreground">Account Type</Label>
+                    <Badge variant="outline" className={`text-xs w-fit font-medium ${getAccountTypeMeta(viewUser).className}`}>
+                      {getAccountTypeMeta(viewUser).label}
+                    </Badge>
+                  </div>
                   <div className="grid gap-2">
                     <Label className="text-muted-foreground">Status</Label>
                     <Badge variant={getStatusBadgeVariant(viewUser)} className="text-xs w-fit">
