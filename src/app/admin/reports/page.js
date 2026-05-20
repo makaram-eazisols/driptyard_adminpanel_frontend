@@ -514,6 +514,32 @@ function Reports() {
     );
   };
 
+  const getReviewFlagDescription = (description) => {
+    if (!description) return "";
+    const lines = String(description)
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+    const detailsLine = lines.find((line) => /^details\s*:/i.test(line));
+    if (detailsLine) {
+      return detailsLine.replace(/^details\s*:/i, "").trim();
+    }
+    const cleaned = lines.filter(
+      (line) =>
+        !/^\[review red flag/i.test(line) &&
+        !/^review id\s*:/i.test(line) &&
+        !/^order\s*:/i.test(line),
+    );
+    return cleaned.join(" ").trim();
+  };
+
+  const getReportDescription = (report) => {
+    if (report?.isReviewRedFlag) {
+      return getReviewFlagDescription(report.description) || "—";
+    }
+    return report?.description || "—";
+  };
+
   const normalizeReviewPhotosAdmin = (photos) => {
     if (!photos) return [];
     if (typeof photos === "string") {
@@ -610,7 +636,7 @@ function Reports() {
                           <span className="text-sm break-words">{r.reason || "—"}</span>
                         </TableCell>
                         <TableCell className="max-w-xs">
-                          <span className="text-sm break-words">{r.description || "—"}</span>
+                          <span className="text-sm break-words">{getReportDescription(r)}</span>
                         </TableCell>
                         <TableCell>
                           <Badge variant={statusVariant(r.status)} className="capitalize">
