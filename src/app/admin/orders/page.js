@@ -49,6 +49,9 @@ const STATUS_OPTIONS = [
 
 const SUCCESS_STATUSES = ["completed", "paid", "paid_escrow", "released", "paid_out"];
 
+const formatPayoutStatusLabel = (status) =>
+  status ? String(status).replace(/_/g, " ") : "—";
+
 const REFUND_APPROVE_BTN =
   "h-8 shrink-0 px-2 text-xs border-green-600 text-green-700 bg-background hover:!bg-green-50 hover:!text-green-800 hover:!border-green-700";
 const REFUND_REJECT_BTN =
@@ -436,9 +439,9 @@ function Orders() {
       {
         label: "Payout status",
         value: (() => {
-          const raw = order.payout_status ?? "—";
+          const raw = order.payout_status;
           if (order.refund_status === "PAID" || raw === "REFUND_PAID") return "PAID (refund)";
-          return raw;
+          return formatPayoutStatusLabel(raw);
         })(),
       },
       { label: "Fulfillment", value: order.fulfillment_method ?? "—" },
@@ -550,7 +553,7 @@ function Orders() {
                     <TableHead>Fulfillment</TableHead>
                     <TableHead>Order Status</TableHead>
                     <TableHead>Escrow</TableHead>
-                    <TableHead>Payout</TableHead>
+                    <TableHead className="w-[1%] whitespace-nowrap">Payout</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -683,8 +686,8 @@ function Orders() {
                             {order.escrow_status || 'N/A'}
                           </Badge>
                         </TableCell>
-                        <TableCell>
-                          <div className="flex flex-col gap-1">
+                        <TableCell className="w-[1%] whitespace-nowrap">
+                          <div className="flex flex-col items-start gap-1 max-w-[120px]">
                             {(() => {
                               const { isCenterStagePackage, commissionAmount } = getOrderFinancials(order);
                               if (!isCenterStagePackage) return null;
@@ -698,10 +701,10 @@ function Orders() {
                               const refundPaid =
                                 order.refund_status === "PAID" || order.payout_status === "REFUND_PAID";
                               const sellerPaidOut = order.payout_status === "PAID_OUT";
-                              const label = refundPaid ? "PAID" : order.payout_status;
+                              const label = refundPaid ? "PAID" : formatPayoutStatusLabel(order.payout_status);
                               const variant = refundPaid || sellerPaidOut ? "success" : "outline";
                               return (
-                                <Badge variant={variant}>{label}</Badge>
+                                <Badge variant={variant} className="w-fit shrink-0">{label}</Badge>
                               );
                             })()}
                             {order.payout_requested && order.seller_bank_details && (
