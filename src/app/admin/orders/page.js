@@ -49,6 +49,11 @@ const STATUS_OPTIONS = [
 
 const SUCCESS_STATUSES = ["completed", "paid", "paid_escrow", "released", "paid_out"];
 
+const REFUND_APPROVE_BTN =
+  "h-8 shrink-0 px-2 text-xs border-green-600 text-green-700 bg-background hover:!bg-green-50 hover:!text-green-800 hover:!border-green-700";
+const REFUND_REJECT_BTN =
+  "h-8 shrink-0 px-2 text-xs border-destructive text-destructive bg-background hover:!bg-destructive/10 hover:!text-destructive hover:!border-destructive";
+
 function Orders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -715,14 +720,15 @@ function Orders() {
                           </div>
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex justify-end">
+                          <div className="flex flex-wrap items-center justify-end gap-1">
                             <Button
                               variant="outline"
                               size="sm"
+                              className="h-8 w-8 shrink-0 p-0"
                               onClick={() => setDetailsOrder(order)}
                               title="View full order details"
                             >
-                              <FileText className="" />
+                              <FileText className="h-4 w-4" />
                             </Button>
                             {order.payout_requested &&
                               order.buyer_confirmed_receipt &&
@@ -734,9 +740,10 @@ function Orders() {
                                 size="sm"
                                 onClick={() => handleReleasePayout(order.id)}
                                 disabled={loading}
-                                className="bg-accent text-accent-foreground"
+                                title="Release Payout"
+                                className="h-8 shrink-0 px-2 text-xs bg-accent text-accent-foreground"
                               >
-                                Release Payout
+                                Release
                               </Button>
                             )}
                             {order.escrow_status === 'RELEASED' &&
@@ -747,9 +754,11 @@ function Orders() {
                                 size="sm"
                                 variant="outline"
                                 disabled={loading}
+                                title="Mark Paid Out"
+                                className="h-8 shrink-0 px-2 text-xs hover:!bg-muted hover:!text-foreground"
                                 onClick={() => handleMarkPaidOut(order.id)}
                               >
-                                Mark Paid Out
+                                Paid Out
                               </Button>
                             )}
                             {order.refund_requested && (order.refund_status === 'REQUESTED' || order.refund_status === 'APPROVED') && (
@@ -759,20 +768,22 @@ function Orders() {
                                     <Button
                                       size="sm"
                                       variant="outline"
-                                      className="text-green-600 border-green-600 hover:bg-green-50"
+                                      className={REFUND_APPROVE_BTN}
                                       disabled={loading}
+                                      title="Approve Refund"
                                       onClick={() => handleApproveRefund(order.id)}
                                     >
-                                      Approve Refund
+                                      Approve
                                     </Button>
                                     <Button
                                       size="sm"
                                       variant="outline"
-                                      className="text-destructive border-destructive hover:bg-destructive/10"
+                                      className={REFUND_REJECT_BTN}
                                       disabled={loading}
+                                      title="Reject Refund"
                                       onClick={() => handleRejectRefund(order.id)}
                                     >
-                                      Reject Refund
+                                      Reject
                                     </Button>
                                   </>
                                 )}
@@ -780,16 +791,22 @@ function Orders() {
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    className="bg-accent text-accent-foreground"
+                                    title="Mark Refund Paid"
+                                    className="h-8 shrink-0 px-2 text-xs bg-accent text-accent-foreground hover:!bg-accent hover:!text-accent-foreground"
                                     disabled={loading}
                                     onClick={() => handleMarkRefundPaid(order)}
                                   >
-                                    Mark Refund Paid
+                                    Refund Paid
                                   </Button>
                                 )}
                               </>
                             )}
-                            <Button variant="ghost" size="sm" asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 shrink-0 p-0 hover:!bg-muted hover:!text-foreground"
+                              asChild
+                            >
                               <a href={productUrl(order.product_details.id)} target="_blank" rel="noreferrer" title="Open product page">
                                 <ExternalLink className="h-4 w-4" />
                               </a>
@@ -851,24 +868,26 @@ function Orders() {
                     <Button
                       size="sm"
                       variant="outline"
-                      className="text-green-600 border-green-600 hover:bg-green-50"
+                      className={REFUND_APPROVE_BTN}
+                      title="Approve Refund"
                       onClick={() => {
                         handleApproveRefund(detailsOrder.id);
                         setDetailsOrder(null);
                       }}
                     >
-                      Approve Refund
+                      Approve
                     </Button>
                     <Button
                       size="sm"
                       variant="outline"
-                      className="text-destructive border-destructive hover:bg-destructive/10"
+                      className={REFUND_REJECT_BTN}
+                      title="Reject Refund"
                       onClick={() => {
                         handleRejectRefund(detailsOrder.id);
                         setDetailsOrder(null);
                       }}
                     >
-                      Reject Refund
+                      Reject
                     </Button>
                   </>
                 )}

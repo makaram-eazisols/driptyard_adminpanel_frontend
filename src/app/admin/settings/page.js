@@ -485,8 +485,20 @@ export function Settings({ defaultTab = "settings" }) {
     <AdminLayout>
       <div className="space-y-6 max-w-7xl">
         <div>
-          <h1 className="text-3xl font-bold text-secondary">Settings</h1>
-          <p className="text-muted-foreground mt-1">Manage your store settings</p>
+          <h1 className="text-3xl font-bold text-secondary">
+            {defaultTab === "bump-package-settings"
+              ? "Bump Packages"
+              : defaultTab === "manage-packages"
+                ? "Manage Packages"
+                : "Settings"}
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            {defaultTab === "bump-package-settings"
+              ? "Manage bump packages and promo codes"
+              : defaultTab === "manage-packages"
+                ? "Manage membership packages"
+                : "Manage your store settings"}
+          </p>
         </div>
         <Tabs defaultValue={defaultTab} className="space-y-6">
               <TabsContent value="settings" className="mt-0 space-y-6">
@@ -1225,129 +1237,6 @@ export function Settings({ defaultTab = "settings" }) {
         </div>
         <Card>
           <CardHeader>
-            <CardTitle>Promo Code Settings</CardTitle>
-            <CardDescription>Create and manage checkout promo codes.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="promo-code">Code</Label>
-                <Input
-                  id="promo-code"
-                  placeholder="WELCOME10"
-                  value={promoForm.code}
-                  onChange={(e) => setPromoForm((prev) => ({ ...prev, code: e.target.value }))}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Discount Type</Label>
-                <Select
-                  value={promoForm.discount_type}
-                  onValueChange={(value) => setPromoForm((prev) => ({ ...prev, discount_type: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="percentage">Percentage</SelectItem>
-                    <SelectItem value="fixed">Fixed Amount</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="discount-value">Discount Value</Label>
-                <Input
-                  id="discount-value"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={promoForm.discount_value}
-                  onChange={(e) => setPromoForm((prev) => ({ ...prev, discount_value: e.target.value }))}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="start-date">Start Date</Label>
-                <Input
-                  id="start-date"
-                  type="datetime-local"
-                  value={promoForm.start_date}
-                  onChange={(e) => setPromoForm((prev) => ({ ...prev, start_date: e.target.value }))}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="end-date">End Date</Label>
-                <Input
-                  id="end-date"
-                  type="datetime-local"
-                  value={promoForm.end_date}
-                  onChange={(e) => setPromoForm((prev) => ({ ...prev, end_date: e.target.value }))}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="max-uses">Max Uses (optional)</Label>
-                <Input
-                  id="max-uses"
-                  type="number"
-                  min="1"
-                  value={promoForm.max_uses}
-                  onChange={(e) => setPromoForm((prev) => ({ ...prev, max_uses: e.target.value }))}
-                />
-              </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Switch
-                  checked={promoForm.is_active}
-                  onCheckedChange={(value) => setPromoForm((prev) => ({ ...prev, is_active: !!value }))}
-                />
-                <Label>Active</Label>
-              </div>
-              <Button
-                onClick={handleCreatePromoCode}
-                disabled={isSavingPromoCode}
-                className="gradient-driptyard-hover text-white shadow-md"
-              >
-                {isSavingPromoCode ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  "Add Promo Code"
-                )}
-              </Button>
-            </div>
-
-            <Separator />
-            <div className="space-y-2">
-              <h3 className="text-sm font-semibold">Existing Promo Codes</h3>
-              {isLoadingPromoCodes ? (
-                <p className="text-sm text-muted-foreground">Loading promo codes...</p>
-              ) : promoCodes.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No promo codes yet.</p>
-              ) : (
-                <div className="space-y-2">
-                  {promoCodes.map((promo) => (
-                    <div key={promo.id} className="border border-border rounded-md p-3 flex items-center justify-between">
-                      <div className="text-sm">
-                        <p className="font-semibold">{promo.code}</p>
-                        <p className="text-muted-foreground">
-                          {promo.discount_type === "percentage" ? `${promo.discount_value}%` : `S$${promo.discount_value}`} •
-                          Used {promo.used_count}{promo.max_uses ? ` / ${promo.max_uses}` : ""}
-                        </p>
-                      </div>
-                      <Button variant="outline" size="sm" onClick={() => togglePromoCodeStatus(promo)}>
-                        {promo.is_active ? "Disable" : "Enable"}
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
             <CardTitle>Platform Fee Settings</CardTitle>
             <CardDescription>
               Configure buyer and seller platform/admin fee percentages.
@@ -1560,6 +1449,129 @@ export function Settings({ defaultTab = "settings" }) {
                           </div>
                         </div>
                       ))}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Promo Code Settings</CardTitle>
+                    <CardDescription>Create and manage checkout promo codes.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-5">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="promo-code">Code</Label>
+                        <Input
+                          id="promo-code"
+                          placeholder="WELCOME10"
+                          value={promoForm.code}
+                          onChange={(e) => setPromoForm((prev) => ({ ...prev, code: e.target.value }))}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Discount Type</Label>
+                        <Select
+                          value={promoForm.discount_type}
+                          onValueChange={(value) => setPromoForm((prev) => ({ ...prev, discount_type: value }))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="percentage">Percentage</SelectItem>
+                            <SelectItem value="fixed">Fixed Amount</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="discount-value">Discount Value</Label>
+                        <Input
+                          id="discount-value"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={promoForm.discount_value}
+                          onChange={(e) => setPromoForm((prev) => ({ ...prev, discount_value: e.target.value }))}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="start-date">Start Date</Label>
+                        <Input
+                          id="start-date"
+                          type="datetime-local"
+                          value={promoForm.start_date}
+                          onChange={(e) => setPromoForm((prev) => ({ ...prev, start_date: e.target.value }))}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="end-date">End Date</Label>
+                        <Input
+                          id="end-date"
+                          type="datetime-local"
+                          value={promoForm.end_date}
+                          onChange={(e) => setPromoForm((prev) => ({ ...prev, end_date: e.target.value }))}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="max-uses">Max Uses (optional)</Label>
+                        <Input
+                          id="max-uses"
+                          type="number"
+                          min="1"
+                          value={promoForm.max_uses}
+                          onChange={(e) => setPromoForm((prev) => ({ ...prev, max_uses: e.target.value }))}
+                        />
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={promoForm.is_active}
+                          onCheckedChange={(value) => setPromoForm((prev) => ({ ...prev, is_active: !!value }))}
+                        />
+                        <Label>Active</Label>
+                      </div>
+                      <Button
+                        onClick={handleCreatePromoCode}
+                        disabled={isSavingPromoCode}
+                        className="gradient-driptyard-hover text-white shadow-md"
+                      >
+                        {isSavingPromoCode ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          "Add Promo Code"
+                        )}
+                      </Button>
+                    </div>
+
+                    <Separator />
+                    <div className="space-y-2">
+                      <h3 className="text-sm font-semibold">Existing Promo Codes</h3>
+                      {isLoadingPromoCodes ? (
+                        <p className="text-sm text-muted-foreground">Loading promo codes...</p>
+                      ) : promoCodes.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No promo codes yet.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {promoCodes.map((promo) => (
+                            <div key={promo.id} className="border border-border rounded-md p-3 flex items-center justify-between">
+                              <div className="text-sm">
+                                <p className="font-semibold">{promo.code}</p>
+                                <p className="text-muted-foreground">
+                                  {promo.discount_type === "percentage" ? `${promo.discount_value}%` : `S$${promo.discount_value}`} •
+                                  Used {promo.used_count}{promo.max_uses ? ` / ${promo.max_uses}` : ""}
+                                </p>
+                              </div>
+                              <Button variant="outline" size="sm" onClick={() => togglePromoCodeStatus(promo)}>
+                                {promo.is_active ? "Disable" : "Enable"}
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
