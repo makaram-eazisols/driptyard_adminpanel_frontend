@@ -400,11 +400,16 @@ export function Settings({ defaultTab = "settings" }) {
   };
 
   const handleCreatePromoCode = async () => {
-    const code = promoForm.code.trim().toUpperCase();
-    if (!code) {
+    const trimmed = promoForm.code.trim();
+    if (!trimmed) {
       notifyError("Promo code is required.");
       return;
     }
+    if (trimmed !== trimmed.toUpperCase()) {
+      notifyError("Promo code must use uppercase letters only.");
+      return;
+    }
+    const code = trimmed.toUpperCase();
     if (!promoForm.discount_value || Number(promoForm.discount_value) <= 0) {
       notifyError("Discount value must be greater than 0.");
       return;
@@ -1465,7 +1470,12 @@ export function Settings({ defaultTab = "settings" }) {
                           id="promo-code"
                           placeholder="WELCOME10"
                           value={promoForm.code}
-                          onChange={(e) => setPromoForm((prev) => ({ ...prev, code: e.target.value }))}
+                          onChange={(e) =>
+                            setPromoForm((prev) => ({ ...prev, code: e.target.value.toUpperCase() }))
+                          }
+                          className="uppercase"
+                          autoCapitalize="characters"
+                          spellCheck={false}
                         />
                       </div>
                       <div className="space-y-2">
