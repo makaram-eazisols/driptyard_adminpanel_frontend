@@ -23,6 +23,7 @@ import { ConfirmActionDialog } from "@/components/modals/ConfirmActionDialog";
 const MAX_PLANS = 3;
 const MAX_CARDS = 3;
 const MAX_ACTIVE_PLANS = 3;
+const POINTS_PACKAGE_LABELS = ["Small Package", "Medium Package", "Bonus Package"];
 
 const emptyPlanForm = {
   slug: "",
@@ -322,7 +323,8 @@ export function MembershipSettingsSection() {
         <CardHeader>
           <CardTitle>Points cards</CardTitle>
           <CardDescription>
-            Up to {MAX_CARDS} one-time point packages. Prices are charged in SGD via Stripe Checkout.
+            Up to {MAX_CARDS} one-time point packages (Small, Medium, Bonus). The third card automatically
+            receives +200 bonus points at purchase. Prices are charged in SGD via Stripe Checkout.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -344,14 +346,17 @@ export function MembershipSettingsSection() {
             <p className="text-sm text-muted-foreground">No points cards configured.</p>
           ) : (
             <div className="space-y-2">
-              {pointsCards.map((card) => (
+              {pointsCards.map((card, index) => (
                 <div
                   key={card.id}
                   className="border border-border rounded-md p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
                 >
                   <div className="text-sm">
                     <p className="font-semibold">
-                      {card.points_amount} points — S${card.price}
+                      {card.package_name || POINTS_PACKAGE_LABELS[index] || `Package ${index + 1}`} —{" "}
+                      {card.points_amount} points
+                      {card.bonus_points > 0 ? ` + ${card.bonus_points} bonus (${card.total_points} total)` : ""} — S$
+                      {card.price}
                     </p>
                     <p className="text-xs text-muted-foreground">Status: {card.is_active ? "Active" : "Inactive"}</p>
                   </div>
